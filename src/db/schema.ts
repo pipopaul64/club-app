@@ -42,8 +42,8 @@ export const users = pgTable(
   'users',
   {
     id: text('id').primaryKey(),
+    // nullable : Better-Auth crée l'user sans clubId, on l'assigne juste après
     clubId: text('club_id')
-      .notNull()
       .references(() => clubs.id, { onDelete: 'cascade' }),
     email: text('email').notNull(),
     emailVerified: boolean('email_verified').notNull().default(false),

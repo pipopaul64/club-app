@@ -16,8 +16,8 @@ type RouteRule = {
 const ROUTE_RULES: RouteRule[] = [
   // Routes publiques
   { pattern: /^\/$/, public: true },
-  { pattern: /^\/login/, public: true },
-  { pattern: /^\/register/, public: true },
+  { pattern: /^\/login(\/.*)?$/, public: true },
+  { pattern: /^\/register(\/.*)?$/, public: true },
   { pattern: /^\/api\/auth\//, public: true },
   { pattern: /^\/api\/webhooks\//, public: true },
   { pattern: /^\/_next\//, public: true },
