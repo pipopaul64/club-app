@@ -36,9 +36,7 @@ export function TeamForm({
   // Mode custom si : aucune catégorie existante, ou si la catégorie actuelle
   // n'est pas dans la liste (ex : modif d'une équipe avec catégorie unique)
   const isInList = existingCategories.includes(defaultCategory)
-  const [isCustom, setIsCustom] = useState(
-    existingCategories.length === 0 || (!!defaultCategory && !isInList),
-  )
+  const [isCustom, setIsCustom] = useState(!!defaultCategory && !isInList)
   const [customValue, setCustomValue] = useState(!isInList ? defaultCategory : '')
 
   useEffect(() => {
