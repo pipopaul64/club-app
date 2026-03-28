@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { auth } from './auth'
 import type { UserRole } from '@/db/schema'
-import { hasRole } from './roles'
+import { checkRole } from './check-role'
 
 /**
  * Résout la session courante depuis les headers HTTP.
@@ -16,49 +16,41 @@ export async function requireSession() {
 }
 
 /**
- * Résout la session ET vérifie le rôle.
- * Le clubId est lu depuis la session (jamais depuis le client).
+ * Combinaison la plus courante dans les Server Actions :
+ * session valide + rôle autorisé + clubId résolu depuis la session.
  *
- * @throws {Error} 'Unauthorized' | 'Forbidden'
- */
-export async function requireRole(requiredRoles: UserRole[]) {
-  const session = await requireSession()
-  const userRole = (session.user as { role?: UserRole }).role ?? 'user'
-
-  if (!hasRole(userRole, requiredRoles)) {
-    throw new Error('Forbidden')
-  }
-
-  return session
-}
-
-/**
- * Résout le clubId depuis la session — jamais depuis le client.
+ * Le clubId ne transite jamais par le client.
  *
- * @throws {Error} 'Unauthorized' | 'No club associated'
- */
-export async function requireClubId(): Promise<string> {
-  const session = await requireSession()
-  const clubId = (session.user as { clubId?: string }).clubId
-
-  if (!clubId) throw new Error('No club associated with this user')
-
-  return clubId
-}
-
-/**
- * Combinaison la plus courante : session + rôle + clubId.
+ * @throws {Error} 'Unauthorized' | 'Forbidden' | 'No club associated with this user'
  */
 export async function requireAuth(requiredRoles: UserRole[]) {
-  const session = await requireRole(requiredRoles)
-  const clubId = (session.user as { clubId?: string }).clubId
+  const session = await requireSession()
 
+  // Vérification du rôle depuis la DB (source de vérité, filtre soft-delete)
+  const allowed = await checkRole(session.user.id, requiredRoles)
+  if (!allowed) throw new Error('Forbidden')
+
+  // Le clubId est lu depuis la session — jamais depuis le client
+  const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
+
+  const role = (session.user as { role?: string }).role as UserRole ?? 'user'
 
   return {
     session,
     user: session.user,
     clubId,
-    role: (session.user as { role?: UserRole }).role ?? 'user',
+    role,
   }
+}
+
+/**
+ * Vérifie uniquement la session, sans contrainte de rôle ni de clubId.
+ * Utile pour les pages dashboard accessibles à tous les rôles.
+ */
+export async function requireSessionWithClub() {
+  const session = await requireSession()
+  const clubId = (session.user as { clubId?: string }).clubId
+  if (!clubId) throw new Error('No club associated with this user')
+  return { session, user: session.user, clubId }
 }
