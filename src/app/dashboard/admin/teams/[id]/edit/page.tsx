@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getTeam, updateTeam } from '@/app/dashboard/admin/actions'
+import { getTeam, updateTeam, listTeamCategories } from '@/app/dashboard/admin/actions'
 import { TeamForm } from '../../_components/TeamForm'
 
 type Props = {
@@ -9,7 +9,11 @@ type Props = {
 
 export default async function EditTeamPage({ params }: Props) {
   const { id } = await params
-  const team = await getTeam(id)
+
+  const [team, existingCategories] = await Promise.all([
+    getTeam(id),
+    listTeamCategories(),
+  ])
 
   if (!team) notFound()
 
@@ -45,6 +49,7 @@ export default async function EditTeamPage({ params }: Props) {
             category: team.category,
             season: team.season,
           }}
+          existingCategories={existingCategories}
           submitLabel="Enregistrer les modifications"
           cancelHref={`/dashboard/admin/teams/${id}`}
         />

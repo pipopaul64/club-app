@@ -1,8 +1,10 @@
 import Link from 'next/link'
-import { createTeam } from '@/app/dashboard/admin/actions'
+import { createTeam, listTeamCategories } from '@/app/dashboard/admin/actions'
 import { TeamForm } from '../_components/TeamForm'
 
-export default function NewTeamPage() {
+export default async function NewTeamPage() {
+  const existingCategories = await listTeamCategories()
+
   return (
     <div className="p-6 max-w-xl mx-auto">
       {/* Header */}
@@ -28,6 +30,7 @@ export default function NewTeamPage() {
       >
         <TeamForm
           action={createTeam}
+          existingCategories={existingCategories}
           submitLabel="Créer l'équipe"
           cancelHref="/dashboard/admin/teams"
         />

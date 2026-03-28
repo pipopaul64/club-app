@@ -482,6 +482,20 @@ export async function listAvailablePlayers(teamId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// listTeamCategories — catégories uniques des équipes du club (triées)
+// ---------------------------------------------------------------------------
+export async function listTeamCategories() {
+  const { clubId } = await getAdminContext()
+
+  const rows = await db.query.teams.findMany({
+    where: eq(teams.clubId, clubId),
+    columns: { category: true },
+  })
+
+  return [...new Set(rows.map((r) => r.category))].sort()
+}
+
+// ---------------------------------------------------------------------------
 // listManagers — licenciés avec rôle manager_sportif ou admin
 // ---------------------------------------------------------------------------
 export async function listManagers() {

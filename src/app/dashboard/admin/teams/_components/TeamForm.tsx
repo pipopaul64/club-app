@@ -5,21 +5,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { ActionResult } from '@/types'
 
-const PRESET_CATEGORIES = [
-  'Séniors',
-  'Réserve',
-  'U23',
-  'U19',
-  'U17',
-  'U15',
-  'U13',
-  'U11',
-  'U9',
-  'U7',
-  'Féminines',
-  'Vétérans',
-]
-
 type TeamFormValues = {
   name?: string
   category?: string
@@ -29,21 +14,32 @@ type TeamFormValues = {
 type TeamFormProps = {
   action: (prev: ActionResult, formData: FormData) => Promise<ActionResult>
   defaultValues?: TeamFormValues
+  existingCategories: string[]
   submitLabel: string
   cancelHref: string
 }
 
 const initialState: ActionResult = { success: false, error: '' }
 
-export function TeamForm({ action, defaultValues, submitLabel, cancelHref }: TeamFormProps) {
+export function TeamForm({
+  action,
+  defaultValues,
+  existingCategories,
+  submitLabel,
+  cancelHref,
+}: TeamFormProps) {
   const router = useRouter()
   const [state, formAction, pending] = useActionState(action, initialState)
 
-  // Si la catégorie par défaut n'est pas dans la liste prédéfinie → mode custom d'emblée
   const defaultCategory = defaultValues?.category ?? ''
-  const isPreset = PRESET_CATEGORIES.includes(defaultCategory)
-  const [isCustom, setIsCustom] = useState(!!defaultCategory && !isPreset)
-  const [customValue, setCustomValue] = useState(!isPreset ? defaultCategory : '')
+
+  // Mode custom si : aucune catégorie existante, ou si la catégorie actuelle
+  // n'est pas dans la liste (ex : modif d'une équipe avec catégorie unique)
+  const isInList = existingCategories.includes(defaultCategory)
+  const [isCustom, setIsCustom] = useState(
+    existingCategories.length === 0 || (!!defaultCategory && !isInList),
+  )
+  const [customValue, setCustomValue] = useState(!isInList ? defaultCategory : '')
 
   useEffect(() => {
     if (state.success) {
@@ -58,16 +54,6 @@ export function TeamForm({ action, defaultValues, submitLabel, cancelHref }: Tea
   }
 
   const labelStyle = { color: '#353148' }
-
-  function handleSwitchToCustom() {
-    setIsCustom(true)
-    setCustomValue('')
-  }
-
-  function handleSwitchToList() {
-    setIsCustom(false)
-    setCustomValue('')
-  }
 
   return (
     <form action={formAction} className="space-y-5">
@@ -96,19 +82,20 @@ export function TeamForm({ action, defaultValues, submitLabel, cancelHref }: Tea
           <label htmlFor="category" className="block text-sm font-medium" style={labelStyle}>
             Catégorie
           </label>
-          {isCustom ? (
+          {isCustom && existingCategories.length > 0 && (
             <button
               type="button"
-              onClick={handleSwitchToList}
+              onClick={() => { setIsCustom(false); setCustomValue('') }}
               className="text-xs hover:underline"
               style={{ color: '#8c60f3' }}
             >
               ← Choisir dans la liste
             </button>
-          ) : (
+          )}
+          {!isCustom && (
             <button
               type="button"
-              onClick={handleSwitchToCustom}
+              onClick={() => { setIsCustom(true); setCustomValue('') }}
               className="text-xs font-medium hover:underline"
               style={{ color: '#8c60f3' }}
             >
@@ -130,14 +117,14 @@ export function TeamForm({ action, defaultValues, submitLabel, cancelHref }: Tea
             style={inputStyle}
             onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
             onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
-            placeholder="Ex : U10 Féminines, Futsal…"
+            placeholder="Ex : Séniors, U17, Féminines…"
           />
         ) : (
           <select
             id="category"
             name="category"
             required
-            defaultValue={isPreset ? defaultCategory : ''}
+            defaultValue={isInList ? defaultCategory : ''}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
             style={inputStyle}
             onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
@@ -146,7 +133,7 @@ export function TeamForm({ action, defaultValues, submitLabel, cancelHref }: Tea
             <option value="" disabled>
               Sélectionner une catégorie…
             </option>
-            {PRESET_CATEGORIES.map((cat) => (
+            {existingCategories.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
               </option>
