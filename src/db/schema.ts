@@ -53,6 +53,7 @@ export const users = pgTable(
     role: text('role').$type<UserRole>().notNull().default('user'),
     birthDate: timestamp('birth_date'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
     deletedAt: timestamp('deleted_at'),
   },
   (t) => [
