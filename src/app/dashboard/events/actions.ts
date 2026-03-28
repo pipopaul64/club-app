@@ -2,9 +2,11 @@
 
 import { db } from '@/db'
 import { events, teams, teamMembers } from '@/db/schema'
-import { requireAuth, requireSessionWithClub } from '@/lib/session'
+import { auth } from '@/lib/auth'
+import { checkRole } from '@/lib/check-role'
 import { createEventSchema, updateEventSchema } from '@/lib/validations'
 import { eq, and, gte, lte, inArray, isNull, or } from 'drizzle-orm'
+import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import type { ActionResult } from '@/types'
 import type { EventType, UserRole } from '@/db/schema'
@@ -13,14 +15,31 @@ import type { SQL } from 'drizzle-orm'
 const REVALIDATE = '/dashboard/calendar'
 
 // ---------------------------------------------------------------------------
-// getSessionContext — session + clubId + role (depuis le cookie, pas de DB check)
-// Utilisé pour les lectures (listEvents, listAccessibleTeams) accessibles à tous
+// Helpers locaux — même pattern que admin/actions.ts (auth.api.getSession direct)
+// Évite le passage par session.ts qui cause "Failed to get session" en SSR
 // ---------------------------------------------------------------------------
+
+/** Session + clubId + role — lecture seule, aucun check de rôle en DB */
 async function getSessionContext() {
-  const { session, clubId } = await requireSessionWithClub()
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) throw new Error('Unauthorized')
+  const clubId = (session.user as { clubId?: string }).clubId
+  if (!clubId) throw new Error('No club associated with this user')
   const userId = session.user.id
   const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
   return { userId, clubId, role }
+}
+
+/** Session + clubId + role — avec vérification du rôle en DB (mutations) */
+async function requireEventAuth(allowedRoles: UserRole[]) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) throw new Error('Unauthorized')
+  const ok = await checkRole(session.user.id, allowedRoles)
+  if (!ok) throw new Error('Forbidden')
+  const clubId = (session.user as { clubId?: string }).clubId
+  if (!clubId) throw new Error('No club associated with this user')
+  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
+  return { user: session.user, userId: session.user.id, clubId, role }
 }
 
 // ===========================================================================
@@ -128,7 +147,7 @@ export async function listAccessibleTeams() {
 // Manager     → uniquement ses équipes assignées
 // ---------------------------------------------------------------------------
 export async function listEventFormTeams() {
-  const { user, clubId, role } = await requireAuth([
+  const { user, clubId, role } = await requireEventAuth([
     'admin',
     'manager_sportif',
     'manager_associatif',
@@ -173,7 +192,7 @@ export async function createEvent(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { user, clubId, role } = await requireAuth([
+  const { user, clubId, role } = await requireEventAuth([
     'admin',
     'manager_sportif',
     'manager_associatif',
@@ -243,7 +262,7 @@ export async function updateEvent(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { user, clubId, role } = await requireAuth(['admin', 'manager_sportif'])
+  const { user, clubId, role } = await requireEventAuth(['admin', 'manager_sportif'])
 
   const parsed = updateEventSchema.safeParse({
     title: formData.get('title'),
@@ -303,7 +322,7 @@ export async function updateEvent(
 // deleteEvent — Admin uniquement, suppression physique (cascade sur convocations…)
 // ---------------------------------------------------------------------------
 export async function deleteEvent(id: string): Promise<ActionResult> {
-  const { clubId } = await requireAuth(['admin'])
+  const { clubId } = await requireEventAuth(['admin'])
 
   await db.delete(events).where(and(eq(events.id, id), eq(events.clubId, clubId)))
 
