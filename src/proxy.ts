@@ -42,7 +42,7 @@ function matchRule(pathname: string): RouteRule | null {
 // ---------------------------------------------------------------------------
 // Middleware
 // ---------------------------------------------------------------------------
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const rule = matchRule(pathname)
