@@ -119,6 +119,7 @@ export function EventForm({
           name="date"
           type="datetime-local"
           required
+          step={1800}
           defaultValue={defaultDateValue}
           className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
           style={inputStyle}
