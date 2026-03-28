@@ -24,6 +24,7 @@ export const clubs = pgTable('clubs', {
 export const clubsRelations = relations(clubs, ({ many }) => ({
   users: many(users),
   teams: many(teams),
+  teamMembers: many(teamMembers),
   events: many(events),
   posts: many(posts),
   messages: many(messages),
@@ -65,6 +66,7 @@ export const users = pgTable(
 export const usersRelations = relations(users, ({ one, many }) => ({
   club: one(clubs, { fields: [users.clubId], references: [clubs.id] }),
   managedTeams: many(teams),
+  teamMemberships: many(teamMembers),
   convocations: many(convocations),
   presences: many(presences),
   performances: many(performances),
@@ -137,8 +139,39 @@ export const teams = pgTable('teams', {
 export const teamsRelations = relations(teams, ({ one, many }) => ({
   club: one(clubs, { fields: [teams.clubId], references: [clubs.id] }),
   manager: one(users, { fields: [teams.managerId], references: [users.id] }),
+  members: many(teamMembers),
   events: many(events),
   messages: many(messages),
+}))
+
+// ---------------------------------------------------------------------------
+// team_members — assignation joueurs/staff aux équipes
+// ---------------------------------------------------------------------------
+export const teamMembers = pgTable(
+  'team_members',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clubId: text('club_id')
+      .notNull()
+      .references(() => clubs.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('team_members_team_user_idx').on(t.teamId, t.userId),
+    index('team_members_user_club_idx').on(t.userId, t.clubId),
+  ],
+)
+
+export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
+  team: one(teams, { fields: [teamMembers.teamId], references: [teams.id] }),
+  user: one(users, { fields: [teamMembers.userId], references: [users.id] }),
+  club: one(clubs, { fields: [teamMembers.clubId], references: [clubs.id] }),
 }))
 
 // ---------------------------------------------------------------------------
