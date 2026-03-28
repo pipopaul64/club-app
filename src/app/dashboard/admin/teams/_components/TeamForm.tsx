@@ -78,53 +78,49 @@ export function TeamForm({
 
       {/* Catégorie */}
       <div>
-        <div className="flex items-center justify-between mb-1">
-          <label htmlFor="category" className="block text-sm font-medium" style={labelStyle}>
-            Catégorie
-          </label>
-          {isCustom && existingCategories.length > 0 && (
-            <button
-              type="button"
-              onClick={() => { setIsCustom(false); setCustomValue('') }}
-              className="text-xs hover:underline"
-              style={{ color: '#8c60f3' }}
-            >
-              ← Choisir dans la liste
-            </button>
-          )}
-          {!isCustom && (
-            <button
-              type="button"
-              onClick={() => { setIsCustom(true); setCustomValue('') }}
-              className="text-xs font-medium hover:underline"
-              style={{ color: '#8c60f3' }}
-            >
-              + Ajouter
-            </button>
-          )}
-        </div>
+        <label htmlFor="category" className="block text-sm font-medium mb-1" style={labelStyle}>
+          Catégorie
+        </label>
 
         {isCustom ? (
-          <input
-            id="category"
-            name="category"
-            type="text"
-            required
-            autoFocus
-            value={customValue}
-            onChange={(e) => setCustomValue(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
-            onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
-            placeholder="Ex : Séniors, U17, Féminines…"
-          />
+          <div className="space-y-1.5">
+            <input
+              id="category"
+              name="category"
+              type="text"
+              required
+              autoFocus
+              value={customValue}
+              onChange={(e) => setCustomValue(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+              style={inputStyle}
+              onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
+              onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
+              placeholder="Ex : Séniors, U17, Féminines…"
+            />
+            {existingCategories.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { setIsCustom(false); setCustomValue('') }}
+                className="text-xs hover:underline"
+                style={{ color: '#8e8a9c' }}
+              >
+                ← Choisir dans la liste
+              </button>
+            )}
+          </div>
         ) : (
           <select
             id="category"
             name="category"
             required
             defaultValue={isInList ? defaultCategory : ''}
+            onChange={(e) => {
+              if (e.target.value === '__add__') {
+                setIsCustom(true)
+                setCustomValue('')
+              }
+            }}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
             style={inputStyle}
             onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
@@ -138,6 +134,7 @@ export function TeamForm({
                 {cat}
               </option>
             ))}
+            <option value="__add__">+ Ajouter une catégorie</option>
           </select>
         )}
       </div>
