@@ -1,9 +1,24 @@
 'use client'
 
-import { useActionState, useEffect } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { ActionResult } from '@/types'
+
+const PRESET_CATEGORIES = [
+  'Séniors',
+  'Réserve',
+  'U23',
+  'U19',
+  'U17',
+  'U15',
+  'U13',
+  'U11',
+  'U9',
+  'U7',
+  'Féminines',
+  'Vétérans',
+]
 
 type TeamFormValues = {
   name?: string
@@ -24,6 +39,12 @@ export function TeamForm({ action, defaultValues, submitLabel, cancelHref }: Tea
   const router = useRouter()
   const [state, formAction, pending] = useActionState(action, initialState)
 
+  // Si la catégorie par défaut n'est pas dans la liste prédéfinie → mode custom d'emblée
+  const defaultCategory = defaultValues?.category ?? ''
+  const isPreset = PRESET_CATEGORIES.includes(defaultCategory)
+  const [isCustom, setIsCustom] = useState(!!defaultCategory && !isPreset)
+  const [customValue, setCustomValue] = useState(!isPreset ? defaultCategory : '')
+
   useEffect(() => {
     if (state.success) {
       router.push('/dashboard/admin/teams')
@@ -37,6 +58,16 @@ export function TeamForm({ action, defaultValues, submitLabel, cancelHref }: Tea
   }
 
   const labelStyle = { color: '#353148' }
+
+  function handleSwitchToCustom() {
+    setIsCustom(true)
+    setCustomValue('')
+  }
+
+  function handleSwitchToList() {
+    setIsCustom(false)
+    setCustomValue('')
+  }
 
   return (
     <form action={formAction} className="space-y-5">
@@ -61,21 +92,67 @@ export function TeamForm({ action, defaultValues, submitLabel, cancelHref }: Tea
 
       {/* Catégorie */}
       <div>
-        <label htmlFor="category" className="block text-sm font-medium mb-1" style={labelStyle}>
-          Catégorie
-        </label>
-        <input
-          id="category"
-          name="category"
-          type="text"
-          required
-          defaultValue={defaultValues?.category ?? ''}
-          className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
-          style={inputStyle}
-          onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
-          onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
-          placeholder="Séniors, U17, Féminines…"
-        />
+        <div className="flex items-center justify-between mb-1">
+          <label htmlFor="category" className="block text-sm font-medium" style={labelStyle}>
+            Catégorie
+          </label>
+          {isCustom ? (
+            <button
+              type="button"
+              onClick={handleSwitchToList}
+              className="text-xs hover:underline"
+              style={{ color: '#8c60f3' }}
+            >
+              ← Choisir dans la liste
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSwitchToCustom}
+              className="text-xs font-medium hover:underline"
+              style={{ color: '#8c60f3' }}
+            >
+              + Ajouter
+            </button>
+          )}
+        </div>
+
+        {isCustom ? (
+          <input
+            id="category"
+            name="category"
+            type="text"
+            required
+            autoFocus
+            value={customValue}
+            onChange={(e) => setCustomValue(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+            style={inputStyle}
+            onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
+            onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
+            placeholder="Ex : U10 Féminines, Futsal…"
+          />
+        ) : (
+          <select
+            id="category"
+            name="category"
+            required
+            defaultValue={isPreset ? defaultCategory : ''}
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+            style={inputStyle}
+            onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
+            onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
+          >
+            <option value="" disabled>
+              Sélectionner une catégorie…
+            </option>
+            {PRESET_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Saison */}
