@@ -55,3 +55,21 @@ export const updateTeamSchema = createTeamSchema
 
 export type CreateTeamInput = z.infer<typeof createTeamSchema>
 export type UpdateTeamInput = z.infer<typeof updateTeamSchema>
+
+// ---------------------------------------------------------------------------
+// Événements
+// ---------------------------------------------------------------------------
+export const eventTypeSchema = z.enum(['match', 'training', 'other'])
+
+export const createEventSchema = z.object({
+  title: z.string().min(2, 'Titre trop court'),
+  type: eventTypeSchema,
+  date: z.string().min(1, 'Date et heure requises'),
+  location: z.string().optional(),
+  teamId: z.string().optional(),
+})
+
+export const updateEventSchema = createEventSchema
+
+export type CreateEventInput = z.infer<typeof createEventSchema>
+export type UpdateEventInput = z.infer<typeof updateEventSchema>
