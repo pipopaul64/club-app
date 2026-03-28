@@ -83,22 +83,29 @@ export function TeamForm({ action, defaultValues, submitLabel, cancelHref }: Tea
         <label htmlFor="season" className="block text-sm font-medium mb-1" style={labelStyle}>
           Saison
         </label>
-        <input
+        <select
           id="season"
           name="season"
-          type="text"
           required
           defaultValue={defaultValues?.season ?? ''}
           className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
           style={inputStyle}
           onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
           onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
-          placeholder="2024-2025"
-          pattern="\d{4}-\d{4}"
-        />
-        <p className="text-xs mt-1" style={{ color: '#8e8a9c' }}>
-          Format : 2024-2025
-        </p>
+        >
+          <option value="" disabled>
+            Sélectionner une saison…
+          </option>
+          {Array.from({ length: 3 }, (_, i) => {
+            const year = new Date().getFullYear() - 1 + i
+            const season = `${year}-${year + 1}`
+            return (
+              <option key={season} value={season}>
+                {season}
+              </option>
+            )
+          })}
+        </select>
       </div>
 
       {/* Erreur */}
