@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { authClient } from '@/lib/auth-client'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -23,21 +24,14 @@ export default function LoginPage() {
     setMessage(null)
 
     if (mode === 'magic-link') {
-      const { error: err } = await authClient.signIn.magicLink({
-        email,
-        callbackURL: redirect,
-      })
+      const { error: err } = await authClient.signIn.magicLink({ email, callbackURL: redirect })
       if (err) {
-        setError(err.message ?? 'Erreur lors de l\'envoi du lien')
+        setError(err.message ?? "Erreur lors de l'envoi du lien")
       } else {
         setMessage('Lien de connexion envoyé ! Vérifiez votre email.')
       }
     } else {
-      const { error: err } = await authClient.signIn.email({
-        email,
-        password,
-        callbackURL: redirect,
-      })
+      const { error: err } = await authClient.signIn.email({ email, password, callbackURL: redirect })
       if (err) {
         setError(err.message ?? 'Identifiants incorrects')
       } else {
@@ -49,14 +43,15 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Connexion</h1>
-        <p className="text-gray-500 text-sm mb-6">Accédez à votre espace ClubOS</p>
+    <main className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#f8f6fc' }}>
+      <div className="w-full max-w-md rounded-xl p-8" style={{ backgroundColor: '#ffffff', border: '1px solid #e4e0ec' }}>
+
+        <h1 className="text-2xl font-bold mb-1" style={{ color: '#353148' }}>Connexion</h1>
+        <p className="text-sm mb-6" style={{ color: '#8e8a9c' }}>Accédez à votre espace ClubOS</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium mb-1" style={{ color: '#353148' }}>
               Email
             </label>
             <input
@@ -65,14 +60,17 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+              style={{ border: '1px solid #e4e0ec', color: '#353148', backgroundColor: '#ffffff' }}
+              onFocus={e => (e.target.style.borderColor = '#8c60f3')}
+              onBlur={e => (e.target.style.borderColor = '#e4e0ec')}
               placeholder="vous@exemple.com"
             />
           </div>
 
           {mode === 'password' && (
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium mb-1" style={{ color: '#353148' }}>
                 Mot de passe
               </label>
               <input
@@ -81,47 +79,53 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+                style={{ border: '1px solid #e4e0ec', color: '#353148', backgroundColor: '#ffffff' }}
+                onFocus={e => (e.target.style.borderColor = '#8c60f3')}
+                onBlur={e => (e.target.style.borderColor = '#e4e0ec')}
                 placeholder="••••••••"
               />
             </div>
           )}
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+            <p className="text-sm px-3 py-2 rounded-lg" style={{ color: '#c0392b', backgroundColor: '#fdf0f0' }}>
+              {error}
+            </p>
           )}
           {message && (
-            <p className="text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg">{message}</p>
+            <p className="text-sm px-3 py-2 rounded-lg" style={{ color: '#1a7a4a', backgroundColor: '#f0faf4' }}>
+              {message}
+            </p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="w-full py-2.5 px-4 text-sm font-medium rounded-lg text-white transition-opacity disabled:opacity-50"
+            style={{ backgroundColor: '#8c60f3' }}
           >
-            {loading
-              ? 'Connexion…'
-              : mode === 'magic-link'
-              ? 'Envoyer le lien'
-              : 'Se connecter'}
+            {loading ? 'Connexion…' : mode === 'magic-link' ? 'Envoyer le lien' : 'Se connecter'}
           </button>
         </form>
 
         <div className="mt-4 text-center">
           <button
             type="button"
-            onClick={() => {
-              setMode(mode === 'password' ? 'magic-link' : 'password')
-              setError(null)
-              setMessage(null)
-            }}
-            className="text-sm text-blue-600 hover:underline"
+            onClick={() => { setMode(mode === 'password' ? 'magic-link' : 'password'); setError(null); setMessage(null) }}
+            className="text-sm font-medium hover:underline"
+            style={{ color: '#8c60f3' }}
           >
-            {mode === 'password'
-              ? 'Connexion par lien magique'
-              : 'Connexion par mot de passe'}
+            {mode === 'password' ? 'Connexion par lien magique' : 'Connexion par mot de passe'}
           </button>
         </div>
+
+        <p className="mt-4 text-center text-sm" style={{ color: '#8e8a9c' }}>
+          Pas encore de compte ?{' '}
+          <Link href="/register" className="font-medium hover:underline" style={{ color: '#8c60f3' }}>
+            Créer mon club
+          </Link>
+        </p>
       </div>
     </main>
   )
