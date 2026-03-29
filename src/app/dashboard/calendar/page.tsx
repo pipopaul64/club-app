@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { requireSessionWithClub } from '@/lib/session'
+import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { listEvents, listAccessibleTeams } from '@/app/dashboard/events/actions'
 import { TeamFilter } from '@/app/dashboard/events/_components/TeamFilter'
 import type { UserRole, EventType } from '@/db/schema'
@@ -76,8 +78,14 @@ export default async function CalendarPage({ searchParams }: Props) {
 
   const [year, month] = currentMonth.split('-').map(Number)
 
-  // Session + rôle (lecture depuis le cookie — suffisant pour affichage conditionnel)
-  const { session } = await requireSessionWithClub()
+  // Session + rôle — appel direct pour éviter les erreurs Better-Auth en SSR
+  let session = null
+  try {
+    session = await auth.api.getSession({ headers: await headers() })
+  } catch {
+    redirect('/login')
+  }
+  if (!session) redirect('/login')
   const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
 
   // Données en parallèle

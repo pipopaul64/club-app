@@ -10,7 +10,12 @@ import { checkRole } from './check-role'
  * @throws {Error} 'Unauthorized' si aucune session valide
  */
 export async function requireSession() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  let session = null
+  try {
+    session = await auth.api.getSession({ headers: await headers() })
+  } catch {
+    throw new Error('Unauthorized')
+  }
   if (!session) throw new Error('Unauthorized')
   return session
 }

@@ -1,9 +1,16 @@
 'use client'
 
-import { useActionState, useEffect } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { ActionResult } from '@/types'
+
+// Créneaux toutes les 30 min : 00:00 → 23:30
+const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2).toString().padStart(2, '0')
+  const m = i % 2 === 0 ? '00' : '30'
+  return `${h}:${m}`
+})
 
 const EVENT_TYPE_LABELS = {
   match: 'Match',
@@ -57,10 +64,21 @@ export function EventForm({
 
   const labelStyle = { color: '#353148' }
 
-  // Convertir une date DB en valeur datetime-local ('YYYY-MM-DDTHH:mm')
-  const defaultDateValue = defaultValues?.date
-    ? new Date(defaultValues.date).toISOString().slice(0, 16)
+  // Décomposer la date par défaut en partie date + heure arrondie à 30 min
+  const defaultDateVal = defaultValues?.date
+    ? new Date(defaultValues.date).toISOString().slice(0, 10)
     : ''
+  const defaultTimeVal = defaultValues?.date
+    ? (() => {
+        const d = new Date(defaultValues.date)
+        const h = d.getHours().toString().padStart(2, '0')
+        const m = d.getMinutes() >= 30 ? '30' : '00'
+        return `${h}:${m}`
+      })()
+    : '10:00'
+
+  const [dateVal, setDateVal] = useState(defaultDateVal)
+  const [timeVal, setTimeVal] = useState(defaultTimeVal)
 
   return (
     <form action={formAction} className="space-y-5">
@@ -109,23 +127,50 @@ export function EventForm({
         </select>
       </div>
 
-      {/* Date et heure */}
-      <div>
-        <label htmlFor="date" className="block text-sm font-medium mb-1" style={labelStyle}>
-          Date et heure
-        </label>
-        <input
-          id="date"
-          name="date"
-          type="datetime-local"
-          required
-          step={1800}
-          defaultValue={defaultDateValue}
-          className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
-          style={inputStyle}
-          onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
-          onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
-        />
+      {/* Date et heure — hidden input combine les deux valeurs pour le Server Action */}
+      <input type="hidden" name="date" value={dateVal && timeVal ? `${dateVal}T${timeVal}` : ''} />
+
+      <div className="flex gap-3">
+        {/* Date */}
+        <div className="flex-1">
+          <label htmlFor="date-day" className="block text-sm font-medium mb-1" style={labelStyle}>
+            Date
+          </label>
+          <input
+            id="date-day"
+            type="date"
+            required
+            value={dateVal}
+            onChange={(e) => setDateVal(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+            style={inputStyle}
+            onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
+            onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
+          />
+        </div>
+
+        {/* Heure — uniquement par tranches de 30 min */}
+        <div className="w-36">
+          <label htmlFor="date-time" className="block text-sm font-medium mb-1" style={labelStyle}>
+            Heure
+          </label>
+          <select
+            id="date-time"
+            required
+            value={timeVal}
+            onChange={(e) => setTimeVal(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+            style={inputStyle}
+            onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
+            onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
+          >
+            {TIME_SLOTS.map((slot) => (
+              <option key={slot} value={slot}>
+                {slot}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Lieu */}
