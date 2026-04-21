@@ -85,3 +85,13 @@ export const createConvocationSchema = z.object({
 })
 
 export type CreateConvocationInput = z.infer<typeof createConvocationSchema>
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+export const createMessageSchema = z.object({
+  content: z.string().min(1, 'Le message ne peut pas être vide').max(2000, 'Message trop long (2000 caractères max)'),
+  teamId: z.string().optional(),
+})
+
+export type CreateMessageInput = z.infer<typeof createMessageSchema>

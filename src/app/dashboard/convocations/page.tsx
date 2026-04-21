@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { listMyConvocations } from '@/app/dashboard/convocations/actions'
 import { StatusButtons } from './_components/StatusButtons'
 
+
 const TYPE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   match:    { label: 'Match',         color: '#c0392b', bg: '#fdf0f0' },
   training: { label: 'Entraînement',  color: '#2563eb', bg: '#eff6ff' },
@@ -162,20 +163,32 @@ export default async function ConvocationsPage() {
                       {positionKey && ` · ${POSITION_LABELS[positionKey]}`}
                     </p>
                   </div>
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full shrink-0"
-                    style={
-                      conv.status === 'confirmed'
-                        ? { color: '#166534', backgroundColor: '#dcfce7' }
-                        : conv.status === 'declined'
-                        ? { color: '#991b1b', backgroundColor: '#fee2e2' }
-                        : { color: '#92400e', backgroundColor: '#fef3c7' }
-                    }
-                  >
-                    {conv.status === 'confirmed' ? 'Confirmé'
-                     : conv.status === 'declined' ? 'Décliné'
-                     : 'En attente'}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Lien feuille de match/présence */}
+                    {conv.status === 'confirmed' && (
+                      <Link
+                        href={`/dashboard/match-sheet/${conv.event.id}`}
+                        className="text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
+                        style={{ color: '#8c60f3', backgroundColor: '#f3f0ff' }}
+                      >
+                        {conv.event.type === 'match' ? '📋 Feuille' : '✓ Présences'}
+                      </Link>
+                    )}
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full"
+                      style={
+                        conv.status === 'confirmed'
+                          ? { color: '#166534', backgroundColor: '#dcfce7' }
+                          : conv.status === 'declined'
+                          ? { color: '#991b1b', backgroundColor: '#fee2e2' }
+                          : { color: '#92400e', backgroundColor: '#fef3c7' }
+                      }
+                    >
+                      {conv.status === 'confirmed' ? 'Confirmé'
+                       : conv.status === 'declined' ? 'Décliné'
+                       : 'En attente'}
+                    </span>
+                  </div>
                 </div>
               )
             })}
