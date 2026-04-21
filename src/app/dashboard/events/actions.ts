@@ -1,7 +1,7 @@
 'use server'
 
 import { db } from '@/db'
-import { events, teams, teamMembers } from '@/db/schema'
+import { events, teams, teamMembers, users } from '@/db/schema'
 import { auth } from '@/lib/auth'
 import { checkRole } from '@/lib/check-role'
 import { createEventSchema, updateEventSchema } from '@/lib/validations'
@@ -19,7 +19,6 @@ const REVALIDATE = '/dashboard/calendar'
 // Évite le passage par session.ts qui cause "Failed to get session" en SSR
 // ---------------------------------------------------------------------------
 
-/** Session + clubId + role — lecture seule, aucun check de rôle en DB */
 async function getSessionContext() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) throw new Error('Unauthorized')
@@ -30,7 +29,6 @@ async function getSessionContext() {
   return { userId, clubId, role }
 }
 
-/** Session + clubId + role — avec vérification du rôle en DB (mutations) */
 async function requireEventAuth(allowedRoles: UserRole[]) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) throw new Error('Unauthorized')
@@ -49,28 +47,33 @@ async function requireEventAuth(allowedRoles: UserRole[]) {
 export type EventFilters = {
   teamId?: string
   type?: string
-  month?: string // format 'YYYY-MM'
+  month?: string                        // 'YYYY-MM' — vue mensuelle
+  dateRange?: { start: Date; end: Date } // vues semaine / jour
 }
 
 // ---------------------------------------------------------------------------
-// listEvents — tous les rôles, filtre de visibilité selon le rôle
-// User        → événements de son équipe + événements du club (teamId null)
-// Manager     → événements de ses équipes + événements du club
-// Admin/Assoc → tous les événements du club
+// listEvents — visibilité selon le rôle :
+//   user        → équipes dont il est membre + événements club (teamId null)
+//   manager     → ses équipes gérées + événements club
+//   admin/assoc → tous les événements du club
 // ---------------------------------------------------------------------------
 export async function listEvents(filters?: EventFilters) {
   const { userId, clubId, role } = await getSessionContext()
 
-  // Plage de dates pour le mois demandé
+  // Plage de dates
   let startDate: Date | undefined
   let endDate: Date | undefined
-  if (filters?.month) {
+
+  if (filters?.dateRange) {
+    startDate = filters.dateRange.start
+    endDate = filters.dateRange.end
+  } else if (filters?.month) {
     const [year, month] = filters.month.split('-').map(Number)
     startDate = new Date(year, month - 1, 1)
     endDate = new Date(year, month, 0, 23, 59, 59)
   }
 
-  // Filtre de visibilité selon le rôle
+  // Filtre de visibilité
   let visibilityCondition: SQL<unknown> | undefined
 
   if (role === 'user') {
@@ -94,7 +97,6 @@ export async function listEvents(filters?: EventFilters) {
         ? or(isNull(events.teamId), inArray(events.teamId, teamIds))
         : isNull(events.teamId)
   }
-  // admin et manager_associatif : pas de restriction de visibilité
 
   return db.query.events.findMany({
     where: and(
@@ -113,7 +115,7 @@ export async function listEvents(filters?: EventFilters) {
 }
 
 // ---------------------------------------------------------------------------
-// listAccessibleTeams — équipes visibles selon le rôle (pour le filtre calendrier)
+// listAccessibleTeams — pour le filtre calendrier
 // ---------------------------------------------------------------------------
 export async function listAccessibleTeams() {
   const { userId, clubId, role } = await getSessionContext()
@@ -142,9 +144,7 @@ export async function listAccessibleTeams() {
 }
 
 // ---------------------------------------------------------------------------
-// listEventFormTeams — équipes disponibles dans le formulaire de création
-// Admin/Assoc → toutes les équipes du club
-// Manager     → uniquement ses équipes assignées
+// listEventFormTeams — pour le formulaire de création
 // ---------------------------------------------------------------------------
 export async function listEventFormTeams() {
   const { user, clubId, role } = await requireEventAuth([
@@ -169,7 +169,7 @@ export async function listEventFormTeams() {
 }
 
 // ---------------------------------------------------------------------------
-// getEvent — détail d'un événement (ownership check)
+// getEvent — détail (ownership check)
 // ---------------------------------------------------------------------------
 export async function getEvent(id: string) {
   const { clubId } = await getSessionContext()
@@ -181,12 +181,108 @@ export async function getEvent(id: string) {
 }
 
 // ===========================================================================
+// NOTIFICATIONS
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// sendEventNotification — fire-and-forget, ne bloque pas l'action
+// Envoie un email à :
+//   - les membres de l'équipe (si teamId)
+//   - tous les membres du club (si pas de teamId — événement club)
+// ---------------------------------------------------------------------------
+async function sendEventNotification(params: {
+  clubId: string
+  teamId?: string | null
+  title: string
+  type: EventType
+  date: Date
+  location?: string | null
+}) {
+  if (!process.env.RESEND_API_KEY) return // non configuré en dev → skip
+
+  const { clubId, teamId, title, type, date, location } = params
+
+  // Récupérer les destinataires
+  let recipients: { email: string; name: string }[] = []
+
+  if (teamId) {
+    // Membres de l'équipe
+    const rows = await db
+      .select({ email: users.email, name: users.name })
+      .from(teamMembers)
+      .innerJoin(users, eq(teamMembers.userId, users.id))
+      .where(
+        and(
+          eq(teamMembers.teamId, teamId),
+          eq(teamMembers.clubId, clubId),
+          isNull(users.deletedAt),
+        ),
+      )
+    recipients = rows
+  } else {
+    // Tous les membres du club
+    const rows = await db
+      .select({ email: users.email, name: users.name })
+      .from(users)
+      .where(and(eq(users.clubId, clubId), isNull(users.deletedAt)))
+    recipients = rows
+  }
+
+  if (recipients.length === 0) return
+
+  const { Resend } = await import('resend')
+  const resend = new Resend(process.env.RESEND_API_KEY)
+
+  const typeLabels: Record<EventType, string> = {
+    match: 'Match',
+    training: 'Entraînement',
+    other: 'Événement',
+  }
+  const typeLabel = typeLabels[type]
+
+  const dateStr = date.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  const timeStr = date.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  // Envoi individuel pour préserver la confidentialité des emails
+  await Promise.allSettled(
+    recipients.map(({ email }) =>
+      resend.emails.send({
+        from: 'ClubOS <onboarding@resend.dev>',
+        to: email,
+        subject: `[ClubOS] ${typeLabel} : ${title}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px">
+            <h2 style="color:#353148;margin-bottom:4px">${typeLabel} : ${title}</h2>
+            <p style="color:#353148;margin:8px 0">
+              <strong>Date :</strong> ${dateStr} à ${timeStr}
+            </p>
+            ${location ? `<p style="color:#353148;margin:8px 0"><strong>Lieu :</strong> ${location}</p>` : ''}
+            <div style="margin-top:24px;padding:16px;background:#f3f0ff;border-radius:8px">
+              <p style="color:#8c60f3;margin:0;font-size:14px">
+                Connectez-vous sur ClubOS pour plus d&apos;informations.
+              </p>
+            </div>
+          </div>
+        `,
+      }),
+    ),
+  )
+}
+
+// ===========================================================================
 // MUTATIONS
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
 // createEvent — Admin + Manager Sportif + Manager Associatif
-// Manager Sportif : teamId obligatoire + doit être une de ses équipes
 // ---------------------------------------------------------------------------
 export async function createEvent(
   _prevState: ActionResult,
@@ -239,15 +335,31 @@ export async function createEvent(
     if (!team) return { success: false, error: 'Équipe introuvable' }
   }
 
+  const eventDate = new Date(date)
+
   await db.insert(events).values({
     id: crypto.randomUUID(),
     clubId,
     teamId: teamId ?? null,
     type: type as EventType,
     title,
-    date: new Date(date),
+    date: eventDate,
     location: location ?? null,
   })
+
+  // Notification email — ne bloque pas en cas d'erreur
+  try {
+    await sendEventNotification({
+      clubId,
+      teamId: teamId ?? null,
+      title,
+      type: type as EventType,
+      date: eventDate,
+      location: location ?? null,
+    })
+  } catch {
+    // Échec silencieux — la création de l'événement est déjà confirmée
+  }
 
   revalidatePath(REVALIDATE)
   return { success: true, data: undefined }
@@ -255,7 +367,6 @@ export async function createEvent(
 
 // ---------------------------------------------------------------------------
 // updateEvent — Admin + Manager Sportif
-// Manager Sportif : peut modifier uniquement les events de ses équipes
 // ---------------------------------------------------------------------------
 export async function updateEvent(
   id: string,
@@ -276,14 +387,12 @@ export async function updateEvent(
     return { success: false, error: parsed.error.errors[0].message }
   }
 
-  // Vérifier que l'événement appartient au club
   const event = await db.query.events.findFirst({
     where: and(eq(events.id, id), eq(events.clubId, clubId)),
     columns: { id: true, teamId: true },
   })
   if (!event) return { success: false, error: 'Événement introuvable' }
 
-  // Manager Sportif : ne peut modifier que les events de ses équipes
   if (role === 'manager_sportif') {
     if (!event.teamId) {
       return { success: false, error: 'Accès refusé à cet événement' }
@@ -319,7 +428,7 @@ export async function updateEvent(
 }
 
 // ---------------------------------------------------------------------------
-// deleteEvent — Admin uniquement, suppression physique (cascade sur convocations…)
+// deleteEvent — Admin uniquement
 // ---------------------------------------------------------------------------
 export async function deleteEvent(id: string): Promise<ActionResult> {
   const { clubId } = await requireEventAuth(['admin'])
