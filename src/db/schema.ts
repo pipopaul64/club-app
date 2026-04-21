@@ -222,6 +222,8 @@ export const convocations = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     status: text('status').$type<ConvocationStatus>().notNull().default('pending'),
+    // null = non assigné | true = titulaire | false = remplaçant
+    isStarter: boolean('is_starter'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (t) => [index('convocations_event_user_idx').on(t.eventId, t.userId)],

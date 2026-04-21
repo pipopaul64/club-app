@@ -73,3 +73,15 @@ export const updateEventSchema = createEventSchema
 
 export type CreateEventInput = z.infer<typeof createEventSchema>
 export type UpdateEventInput = z.infer<typeof updateEventSchema>
+
+// ---------------------------------------------------------------------------
+// Convocations
+// ---------------------------------------------------------------------------
+export const createConvocationSchema = z.object({
+  eventId: z.string().min(1, 'Événement requis'),
+  userIds: z
+    .array(z.string())
+    .min(1, 'Sélectionner au moins un joueur'),
+})
+
+export type CreateConvocationInput = z.infer<typeof createConvocationSchema>
