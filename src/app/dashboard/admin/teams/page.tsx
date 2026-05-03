@@ -72,7 +72,9 @@ export default async function TeamsPage() {
                 </div>
                 <p className="text-sm" style={{ color: '#8e8a9c' }}>
                   {team.members.length} joueur{team.members.length > 1 ? 's' : ''} ·{' '}
-                  Manager : {team.manager?.name ?? '—'}
+                  {team.managers.length === 0
+                    ? 'Aucun manager'
+                    : `Manager${team.managers.length > 1 ? 's' : ''} : ${team.managers.map((m) => m.user.name ?? '?').join(', ')}`}
                 </p>
               </div>
 

@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { checkRole } from '@/lib/check-role'
+import { listManagedTeamIds } from '@/lib/team-managers'
 import { db } from '@/db'
 import { teams } from '@/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ContentForm } from './_components/ContentForm'
@@ -34,12 +35,15 @@ export default async function NewContentPage() {
       orderBy: (t, { asc }) => [asc(t.name)],
     })
   } else {
-    // Manager sportif : uniquement ses équipes
-    availableTeams = await db.query.teams.findMany({
-      where: and(eq(teams.clubId, clubId), eq(teams.managerId, userId)),
-      columns: { id: true, name: true },
-      orderBy: (t, { asc }) => [asc(t.name)],
-    })
+    // Manager : uniquement ses équipes (via team_managers)
+    const managedIds = await listManagedTeamIds(userId, clubId)
+    availableTeams = managedIds.length === 0
+      ? []
+      : await db.query.teams.findMany({
+          where: and(eq(teams.clubId, clubId), inArray(teams.id, managedIds)),
+          columns: { id: true, name: true },
+          orderBy: (t, { asc }) => [asc(t.name)],
+        })
   }
 
   // Manager sportif sans équipe → pas de formulaire

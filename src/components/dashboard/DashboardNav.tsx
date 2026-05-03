@@ -91,6 +91,11 @@ const SECTIONS: NavSection[] = [
         label: 'Licenciés',
       },
       {
+        href:  '/dashboard/admin/invitations',
+        icon:  '✉️',
+        label: 'Invitations',
+      },
+      {
         href:  '/dashboard/admin/teams',
         icon:  '🏃',
         label: 'Équipes',

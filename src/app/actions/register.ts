@@ -74,11 +74,16 @@ export async function registerClub(
     return { success: false, error: msg ?? 'Échec de la création du compte' }
   }
 
-  // clubId + rôle admin assignés côté serveur, jamais depuis le client
-  // Le créateur du club est admin (et reste 'user' implicitement)
+  // clubId + rôle admin assignés côté serveur, jamais depuis le client.
+  // Le créateur du club est admin (et reste 'user' implicitement) ; il
+  // n'a pas besoin de l'onboarding (il gère lui-même ses équipes après).
   await db
     .update(users)
-    .set({ clubId, roles: ['user', 'admin'] })
+    .set({
+      clubId,
+      roles:                 ['user', 'admin'],
+      onboardingCompletedAt: new Date(),
+    })
     .where(eq(users.id, signUpResult.user.id))
 
   return { success: true, data: { redirect: '/dashboard' } }

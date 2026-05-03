@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { convocations, events, teams, teamMembers, users } from '@/db/schema'
 import { auth } from '@/lib/auth'
 import { checkRole } from '@/lib/check-role'
+import { isManagerOfTeam, listManagedTeamIds } from '@/lib/team-managers'
 import { createConvocationSchema } from '@/lib/validations'
 import { eq, and, inArray, isNull, gte, asc } from 'drizzle-orm'
 import { headers } from 'next/headers'
@@ -45,11 +46,11 @@ async function assertEventAccess(
 ) {
   const event = await db.query.events.findFirst({
     where: and(eq(events.id, eventId), eq(events.clubId, clubId)),
-    with: { team: { columns: { id: true, managerId: true } } },
+    columns: { id: true, teamId: true, clubId: true, title: true, type: true, date: true, location: true, createdAt: true },
   })
   if (!event) throw new Error('Événement introuvable')
   if (!roles.includes('admin')) {
-    if (!event.teamId || event.team?.managerId !== userId) {
+    if (!event.teamId || !(await isManagerOfTeam(userId, event.teamId))) {
       throw new Error('Vous ne gérez pas cet événement')
     }
   }
@@ -77,11 +78,7 @@ export async function listEligibleEvents() {
   }
 
   // manager (sans admin) : uniquement ses équipes
-  const managedTeams = await db.query.teams.findMany({
-    where: and(eq(teams.managerId, userId), eq(teams.clubId, clubId)),
-    columns: { id: true },
-  })
-  const teamIds = managedTeams.map((t) => t.id)
+  const teamIds = await listManagedTeamIds(userId, clubId)
 
   if (teamIds.length === 0) return []
 
@@ -197,11 +194,7 @@ export async function listManagerEventsSummary() {
     })
     teamIds = allTeams.map((t) => t.id)
   } else {
-    const managedTeams = await db.query.teams.findMany({
-      where: and(eq(teams.managerId, userId), eq(teams.clubId, clubId)),
-      columns: { id: true },
-    })
-    teamIds = managedTeams.map((t) => t.id)
+    teamIds = await listManagedTeamIds(userId, clubId)
   }
 
   if (teamIds.length === 0) return []

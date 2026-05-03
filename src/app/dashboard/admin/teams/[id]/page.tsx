@@ -4,32 +4,22 @@ import {
   getTeam,
   listAvailablePlayers,
   listManagers,
-  assignManagerToTeam,
+  addManagerToTeam,
   assignPlayerToTeam,
 } from '@/app/dashboard/admin/actions'
 import { AssignManagerForm } from '../_components/AssignManagerForm'
 import { AssignPlayerForm } from '../_components/AssignPlayerForm'
 import { RemovePlayerButton } from '../_components/RemovePlayerButton'
+import { RemoveManagerButton } from '../_components/RemoveManagerButton'
 
 type Props = {
   params: Promise<{ id: string }>
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  user: 'Licencié',
-  manager: 'Manager',
-  admin: 'Admin',
-}
-
-function describeRoles(roles: string[]): string {
-  const labels = roles.filter((r) => r !== 'user').map((r) => ROLE_LABELS[r] ?? r)
-  return labels.length > 0 ? labels.join(', ') : ROLE_LABELS.user
-}
-
 export default async function TeamDetailPage({ params }: Props) {
   const { id } = await params
 
-  const [team, availablePlayers, managers] = await Promise.all([
+  const [team, availablePlayers, allManagers] = await Promise.all([
     getTeam(id),
     listAvailablePlayers(id),
     listManagers(),
@@ -37,8 +27,12 @@ export default async function TeamDetailPage({ params }: Props) {
 
   if (!team) notFound()
 
+  // Liste des managers déjà assignés (pour les exclure du sélecteur)
+  const assignedManagerIds = new Set(team.managers.map((m) => m.user.id))
+  const assignableManagers = allManagers.filter((m) => !assignedManagerIds.has(m.id))
+
   // Lier l'id via bind — ne transite jamais par le client
-  const assignManagerAction = assignManagerToTeam.bind(null, id)
+  const addManagerAction  = addManagerToTeam.bind(null, id)
   const assignPlayerAction = assignPlayerToTeam.bind(null, id)
 
   return (
@@ -80,55 +74,76 @@ export default async function TeamDetailPage({ params }: Props) {
       </div>
 
       <div className="space-y-6">
-        {/* Section Manager */}
+        {/* Section Managers (m:n) */}
         <div
           className="rounded-xl p-5"
           style={{ backgroundColor: '#ffffff', border: '1px solid #e4e0ec' }}
         >
           <h2 className="text-sm font-semibold mb-3" style={{ color: '#353148' }}>
-            Manager
+            Managers{' '}
+            <span
+              className="text-xs font-normal ml-1 px-1.5 py-0.5 rounded-full"
+              style={{ color: '#8e8a9c', backgroundColor: '#f8f6fc' }}
+            >
+              {team.managers.length}
+            </span>
           </h2>
 
-          {team.manager && (
-            <div
-              className="flex items-center gap-3 mb-4 p-3 rounded-lg"
-              style={{ backgroundColor: '#f8f6fc' }}
-            >
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold text-white"
-                style={{ backgroundColor: '#8c60f3' }}
-              >
-                {team.manager.name.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <p className="text-sm font-medium" style={{ color: '#353148' }}>
-                  {team.manager.name}
-                </p>
-                <p className="text-xs" style={{ color: '#8e8a9c' }}>
-                  {describeRoles(team.manager.roles)}
-                </p>
-              </div>
+          {/* Liste des managers actuels */}
+          {team.managers.length > 0 && (
+            <div className="mb-5 divide-y" style={{ borderColor: '#f0eef8' }}>
+              {team.managers.map((m) => (
+                <div key={m.id} className="flex items-center justify-between py-2.5">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold text-white"
+                      style={{ backgroundColor: '#8c60f3' }}
+                    >
+                      {(m.user.name ?? m.user.email).charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium" style={{ color: '#353148' }}>
+                        {m.user.name ?? m.user.email}
+                      </p>
+                      <p className="text-xs" style={{ color: '#8e8a9c' }}>{m.user.email}</p>
+                    </div>
+                  </div>
+                  <RemoveManagerButton
+                    teamId={id}
+                    managerId={m.user.id}
+                    managerName={m.user.name ?? m.user.email}
+                  />
+                </div>
+              ))}
             </div>
           )}
 
-          {managers.length === 0 ? (
-            <p className="text-sm" style={{ color: '#8e8a9c' }}>
-              Aucun Manager disponible dans ce club.{' '}
-              <Link
-                href="/dashboard/admin/users"
-                className="underline"
-                style={{ color: '#8c60f3' }}
-              >
-                Gérer les licenciés
-              </Link>
+          {/* Ajouter un manager */}
+          <div>
+            <p className="text-xs font-medium mb-2" style={{ color: '#8e8a9c' }}>
+              Ajouter un manager
             </p>
-          ) : (
-            <AssignManagerForm
-              action={assignManagerAction}
-              managers={managers}
-              currentManagerId={team.managerId ?? undefined}
-            />
-          )}
+            {assignableManagers.length === 0 ? (
+              <p className="text-sm" style={{ color: '#8e8a9c' }}>
+                {allManagers.length === 0 ? (
+                  <>
+                    Aucun licencié n&apos;a le rôle Manager dans ce club.{' '}
+                    <Link
+                      href="/dashboard/admin/users"
+                      className="underline"
+                      style={{ color: '#8c60f3' }}
+                    >
+                      Gérer les rôles
+                    </Link>
+                  </>
+                ) : (
+                  'Tous les managers du club sont déjà assignés à cette équipe.'
+                )}
+              </p>
+            ) : (
+              <AssignManagerForm action={addManagerAction} managers={assignableManagers} />
+            )}
+          </div>
         </div>
 
         {/* Section Joueurs */}
@@ -159,11 +174,11 @@ export default async function TeamDetailPage({ params }: Props) {
                       className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold text-white"
                       style={{ backgroundColor: '#cccad2' }}
                     >
-                      {member.user.name.charAt(0).toUpperCase()}
+                      {(member.user.name ?? member.user.email).charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <p className="text-sm font-medium" style={{ color: '#353148' }}>
-                        {member.user.name}
+                        {member.user.name ?? member.user.email}
                       </p>
                       <p className="text-xs" style={{ color: '#8e8a9c' }}>
                         {member.user.email}
@@ -173,7 +188,7 @@ export default async function TeamDetailPage({ params }: Props) {
                   <RemovePlayerButton
                     teamId={id}
                     userId={member.user.id}
-                    playerName={member.user.name}
+                    playerName={member.user.name ?? member.user.email}
                   />
                 </div>
               ))}

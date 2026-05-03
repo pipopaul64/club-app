@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
-  createUserSchema,
+  updateUserSchema,
+  createInvitationSchema,
+  redeemInviteSchema,
+  completeOnboardingSchema,
   createTeamSchema,
   createEventSchema,
   createCotisationSchema,
@@ -11,9 +14,9 @@ import {
 } from './validations'
 
 // ---------------------------------------------------------------------------
-// createUserSchema
+// updateUserSchema (createUser supprimé : la création passe par invitation)
 // ---------------------------------------------------------------------------
-describe('createUserSchema', () => {
+describe('updateUserSchema', () => {
   const valid = {
     name: 'Jean Dupont',
     email: 'jean@example.com',
@@ -22,43 +25,82 @@ describe('createUserSchema', () => {
   }
 
   it('accepts a valid user with no extra roles', () => {
-    expect(createUserSchema.safeParse(valid).success).toBe(true)
+    expect(updateUserSchema.safeParse(valid).success).toBe(true)
   })
 
   it('rejects name shorter than 2 chars', () => {
-    const result = createUserSchema.safeParse({ ...valid, name: 'J' })
-    expect(result.success).toBe(false)
+    expect(updateUserSchema.safeParse({ ...valid, name: 'J' }).success).toBe(false)
   })
 
   it('rejects invalid email', () => {
-    const result = createUserSchema.safeParse({ ...valid, email: 'not-an-email' })
-    expect(result.success).toBe(false)
-  })
-
-  it('accepts empty string phone (optional)', () => {
-    const result = createUserSchema.safeParse({ ...valid, phone: '' })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects invalid phone format', () => {
-    const result = createUserSchema.safeParse({ ...valid, phone: 'abc' })
-    expect(result.success).toBe(false)
-  })
-
-  it('rejects unknown role', () => {
-    const result = createUserSchema.safeParse({ ...valid, roles: ['superadmin'] })
-    expect(result.success).toBe(false)
+    expect(updateUserSchema.safeParse({ ...valid, email: 'not-an-email' }).success).toBe(false)
   })
 
   it('rejects implicit user role being assigned explicitly', () => {
-    const result = createUserSchema.safeParse({ ...valid, roles: ['user'] })
-    expect(result.success).toBe(false)
+    expect(updateUserSchema.safeParse({ ...valid, roles: ['user'] }).success).toBe(false)
   })
 
-  it('accepts manager and admin roles individually and combined', () => {
-    expect(createUserSchema.safeParse({ ...valid, roles: ['manager'] }).success).toBe(true)
-    expect(createUserSchema.safeParse({ ...valid, roles: ['admin'] }).success).toBe(true)
-    expect(createUserSchema.safeParse({ ...valid, roles: ['manager', 'admin'] }).success).toBe(true)
+  it('accepts manager + admin combined', () => {
+    expect(updateUserSchema.safeParse({ ...valid, roles: ['manager', 'admin'] }).success).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// createInvitationSchema
+// ---------------------------------------------------------------------------
+describe('createInvitationSchema', () => {
+  it('accepts user role', () => {
+    expect(createInvitationSchema.safeParse({ email: 'a@b.com', invitedRole: 'user' }).success).toBe(true)
+  })
+
+  it('accepts manager role', () => {
+    expect(createInvitationSchema.safeParse({ email: 'a@b.com', invitedRole: 'manager' }).success).toBe(true)
+  })
+
+  it('rejects admin role (not invitable)', () => {
+    expect(createInvitationSchema.safeParse({ email: 'a@b.com', invitedRole: 'admin' }).success).toBe(false)
+  })
+
+  it('rejects invalid email', () => {
+    expect(createInvitationSchema.safeParse({ email: 'oops', invitedRole: 'user' }).success).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// redeemInviteSchema
+// ---------------------------------------------------------------------------
+describe('redeemInviteSchema', () => {
+  it('accepts valid name + 8-char password', () => {
+    expect(redeemInviteSchema.safeParse({ name: 'Jean', password: 'pass1234' }).success).toBe(true)
+  })
+
+  it('rejects short password', () => {
+    expect(redeemInviteSchema.safeParse({ name: 'Jean', password: 'short' }).success).toBe(false)
+  })
+
+  it('rejects empty name', () => {
+    expect(redeemInviteSchema.safeParse({ name: '', password: 'pass1234' }).success).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// completeOnboardingSchema
+// ---------------------------------------------------------------------------
+describe('completeOnboardingSchema', () => {
+  it('accepts an empty payload (all optional)', () => {
+    expect(completeOnboardingSchema.safeParse({}).success).toBe(true)
+  })
+
+  it('accepts arrays of teamIds', () => {
+    const r = completeOnboardingSchema.safeParse({
+      teamMemberIds:  ['t1', 't2'],
+      teamManagerIds: ['t3'],
+    })
+    expect(r.success).toBe(true)
+  })
+
+  it('rejects invalid phone', () => {
+    expect(completeOnboardingSchema.safeParse({ phone: 'abc' }).success).toBe(false)
   })
 })
 

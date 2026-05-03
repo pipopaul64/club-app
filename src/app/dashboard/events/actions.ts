@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { events, teams, teamMembers, users } from '@/db/schema'
 import { auth } from '@/lib/auth'
 import { checkRole } from '@/lib/check-role'
+import { listManagedTeamIds } from '@/lib/team-managers'
 import { createEventSchema, updateEventSchema } from '@/lib/validations'
 import { eq, and, gte, lte, inArray, isNull, or } from 'drizzle-orm'
 import { headers } from 'next/headers'
@@ -79,11 +80,7 @@ export async function listEvents(filters?: EventFilters) {
   if (roles.includes('admin')) {
     // Aucun filtre — admin voit tout le club
   } else if (roles.includes('manager')) {
-    const managedTeams = await db.query.teams.findMany({
-      where: and(eq(teams.managerId, userId), eq(teams.clubId, clubId)),
-      columns: { id: true },
-    })
-    const teamIds = managedTeams.map((t) => t.id)
+    const teamIds = await listManagedTeamIds(userId, clubId)
     visibilityCondition =
       teamIds.length > 0
         ? or(isNull(events.teamId), inArray(events.teamId, teamIds))
@@ -131,8 +128,10 @@ export async function listAccessibleTeams() {
   }
 
   if (roles.includes('manager')) {
+    const teamIds = await listManagedTeamIds(userId, clubId)
+    if (teamIds.length === 0) return []
     return db.query.teams.findMany({
-      where: and(eq(teams.managerId, userId), eq(teams.clubId, clubId)),
+      where: and(eq(teams.clubId, clubId), inArray(teams.id, teamIds)),
       columns: { id: true, name: true },
       orderBy: (t, { asc }) => [asc(t.name)],
     })
@@ -177,11 +176,7 @@ export async function listManagerEvents() {
   // Admin voit tout ; manager (sans admin) ne voit que ses équipes
   let teamCondition = undefined
   if (!roles.includes('admin')) {
-    const managedTeams = await db.query.teams.findMany({
-      where: and(eq(teams.managerId, user.id), eq(teams.clubId, clubId)),
-      columns: { id: true },
-    })
-    const teamIds = managedTeams.map((t) => t.id)
+    const teamIds = await listManagedTeamIds(user.id, clubId)
     if (teamIds.length === 0) return []
     teamCondition = inArray(events.teamId, teamIds)
   }
@@ -202,8 +197,10 @@ export async function listEventFormTeams() {
   const { user, clubId, roles } = await requireEventAuth(['admin', 'manager'])
 
   if (!roles.includes('admin')) {
+    const teamIds = await listManagedTeamIds(user.id, clubId)
+    if (teamIds.length === 0) return []
     return db.query.teams.findMany({
-      where: and(eq(teams.managerId, user.id), eq(teams.clubId, clubId)),
+      where: and(eq(teams.clubId, clubId), inArray(teams.id, teamIds)),
       columns: { id: true, name: true },
       orderBy: (t, { asc }) => [asc(t.name)],
     })
@@ -251,7 +248,7 @@ async function sendEventNotification(params: {
   const { clubId, teamId, title, type, date, location } = params
 
   // Récupérer les destinataires
-  let recipients: { email: string; name: string }[] = []
+  let recipients: { email: string; name: string | null }[] = []
 
   if (teamId) {
     // Membres de l'équipe
@@ -357,15 +354,8 @@ export async function createEvent(
     if (!teamId) {
       return { success: false, error: 'Veuillez sélectionner une équipe' }
     }
-    const managed = await db.query.teams.findFirst({
-      where: and(
-        eq(teams.id, teamId),
-        eq(teams.managerId, user.id),
-        eq(teams.clubId, clubId),
-      ),
-      columns: { id: true },
-    })
-    if (!managed) {
+    const managedIds = await listManagedTeamIds(user.id, clubId)
+    if (!managedIds.includes(teamId)) {
       return { success: false, error: 'Vous ne gérez pas cette équipe' }
     }
   }
@@ -441,15 +431,8 @@ export async function updateEvent(
     if (!event.teamId) {
       return { success: false, error: 'Accès refusé à cet événement' }
     }
-    const managed = await db.query.teams.findFirst({
-      where: and(
-        eq(teams.id, event.teamId),
-        eq(teams.managerId, user.id),
-        eq(teams.clubId, clubId),
-      ),
-      columns: { id: true },
-    })
-    if (!managed) {
+    const managedIds = await listManagedTeamIds(user.id, clubId)
+    if (!managedIds.includes(event.teamId)) {
       return { success: false, error: 'Vous ne gérez pas cet événement' }
     }
   }

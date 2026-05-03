@@ -38,7 +38,7 @@ export default async function EditUserPage({ params }: Props) {
         <UserForm
           action={updateUserWithId}
           defaultValues={{
-            name: user.name,
+            name: user.name ?? '',
             email: user.email,
             phone: user.phone ?? undefined,
             roles: user.roles as UserRole[],

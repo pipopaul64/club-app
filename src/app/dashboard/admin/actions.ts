@@ -1,11 +1,11 @@
 'use server'
 
 import { db } from '@/db'
-import { users, teams, teamMembers } from '@/db/schema'
+import { users, teams, teamMembers, teamManagers } from '@/db/schema'
 import { auth } from '@/lib/auth'
 import { checkRole } from '@/lib/check-role'
 import { hasRole, normalizeRoles } from '@/lib/roles'
-import { createUserSchema, updateUserSchema, createTeamSchema, updateTeamSchema } from '@/lib/validations'
+import { updateUserSchema, createTeamSchema, updateTeamSchema } from '@/lib/validations'
 import { eq, and, isNull, inArray, notInArray, count, sql } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
@@ -86,56 +86,8 @@ export async function getUser(id: string) {
   })
 }
 
-// ---------------------------------------------------------------------------
-// createUser — crée un licencié dans le club de la session
-// ---------------------------------------------------------------------------
-export async function createUser(
-  _prevState: ActionResult,
-  formData: FormData,
-): Promise<ActionResult> {
-  const { clubId } = await getAdminContext()
-
-  const parsed = createUserSchema.safeParse({
-    name: formData.get('name'),
-    email: formData.get('email'),
-    phone: formData.get('phone') || undefined,
-    roles: formData.getAll('roles'),
-    birthDate: formData.get('birthDate') || undefined,
-  })
-
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message }
-  }
-
-  const { name, email, phone, roles, birthDate } = parsed.data
-
-  // Unicité email dans le club
-  const existing = await db.query.users.findFirst({
-    where: and(
-      eq(users.email, email),
-      eq(users.clubId, clubId),
-      isNull(users.deletedAt),
-    ),
-    columns: { id: true },
-  })
-  if (existing) {
-    return { success: false, error: 'Un licencié avec cet email existe déjà dans ce club' }
-  }
-
-  await db.insert(users).values({
-    id: crypto.randomUUID(),
-    clubId, // toujours depuis la session, jamais depuis le client
-    name,
-    email,
-    phone: phone || null,
-    roles: normalizeRoles(roles),
-    birthDate: birthDate ? new Date(birthDate) : null,
-    emailVerified: false,
-  })
-
-  revalidatePath(REVALIDATE)
-  return { success: true, data: undefined }
-}
+// La création d'un licencié passe désormais par invitation
+// (cf. src/app/dashboard/admin/invitations/actions.ts).
 
 // ---------------------------------------------------------------------------
 // updateUser — modifie un licencié du club de la session
@@ -207,7 +159,9 @@ export async function listTeams() {
   return db.query.teams.findMany({
     where: eq(teams.clubId, clubId),
     with: {
-      manager: { columns: { id: true, name: true } },
+      managers: {
+        with: { user: { columns: { id: true, name: true } } },
+      },
       members: { columns: { id: true } },
     },
     orderBy: (t, { desc }) => [desc(t.createdAt)],
@@ -223,7 +177,11 @@ export async function getTeam(id: string) {
   return db.query.teams.findFirst({
     where: and(eq(teams.id, id), eq(teams.clubId, clubId)),
     with: {
-      manager: { columns: { id: true, name: true, roles: true } },
+      managers: {
+        with: {
+          user: { columns: { id: true, name: true, email: true, roles: true } },
+        },
+      },
       members: {
         with: {
           user: { columns: { id: true, name: true, email: true, roles: true } },
@@ -313,45 +271,83 @@ export async function deleteTeam(id: string): Promise<ActionResult> {
 }
 
 // ---------------------------------------------------------------------------
-// assignManagerToTeam — assigne (ou retire) un Manager Sportif à une équipe
-// managerId vide = retirer le manager
+// addManagerToTeam — ajoute un manager à une équipe (m:n via team_managers)
 // ---------------------------------------------------------------------------
-export async function assignManagerToTeam(
+export async function addManagerToTeam(
   teamId: string,
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
   const { clubId } = await getAdminContext()
 
-  const managerId = (formData.get('managerId') as string) || null
+  const managerId = (formData.get('managerId') as string | null) ?? ''
+  if (!managerId) return { success: false, error: 'Sélectionnez un manager' }
 
-  // Vérifier que l'équipe appartient bien au club
+  // Ownership : l'équipe doit appartenir au club
   const team = await db.query.teams.findFirst({
     where: and(eq(teams.id, teamId), eq(teams.clubId, clubId)),
     columns: { id: true },
   })
   if (!team) return { success: false, error: 'Équipe introuvable' }
 
-  if (managerId) {
-    // Vérifier que le manager appartient au club et a le bon rôle
-    const manager = await db.query.users.findFirst({
-      where: and(
-        eq(users.id, managerId),
-        eq(users.clubId, clubId),
-        isNull(users.deletedAt),
-      ),
-      columns: { id: true, roles: true },
-    })
-    if (!manager) return { success: false, error: 'Licencié introuvable' }
-    if (!hasRole(manager.roles as UserRole[], ['manager'])) {
-      return { success: false, error: 'Ce licencié n\'a pas le rôle Manager' }
-    }
+  // Le futur manager doit appartenir au club, être actif et avoir le rôle 'manager'
+  const manager = await db.query.users.findFirst({
+    where: and(
+      eq(users.id, managerId),
+      eq(users.clubId, clubId),
+      isNull(users.deletedAt),
+    ),
+    columns: { id: true, roles: true },
+  })
+  if (!manager) return { success: false, error: 'Licencié introuvable' }
+  if (!hasRole(manager.roles as UserRole[], ['manager'])) {
+    return { success: false, error: 'Ce licencié n\'a pas le rôle Manager' }
   }
 
-  await db
-    .update(teams)
-    .set({ managerId })
-    .where(and(eq(teams.id, teamId), eq(teams.clubId, clubId)))
+  // Refus si déjà manager de cette équipe (uniqueness côté DB de toute façon)
+  const existing = await db.query.teamManagers.findFirst({
+    where: and(eq(teamManagers.teamId, teamId), eq(teamManagers.userId, managerId)),
+    columns: { id: true },
+  })
+  if (existing) {
+    return { success: false, error: 'Ce manager est déjà assigné à cette équipe' }
+  }
+
+  await db.insert(teamManagers).values({
+    id: crypto.randomUUID(),
+    teamId,
+    userId: managerId,
+    clubId,
+  })
+
+  revalidatePath(`${REVALIDATE_TEAMS}/${teamId}`)
+  revalidatePath(REVALIDATE_TEAMS)
+  return { success: true, data: undefined }
+}
+
+// ---------------------------------------------------------------------------
+// removeManagerFromTeam — retire un manager d'une équipe
+// ---------------------------------------------------------------------------
+export async function removeManagerFromTeam(
+  teamId: string,
+  managerId: string,
+): Promise<ActionResult> {
+  const { clubId } = await getAdminContext()
+
+  // Ownership : l'équipe doit appartenir au club
+  const team = await db.query.teams.findFirst({
+    where: and(eq(teams.id, teamId), eq(teams.clubId, clubId)),
+    columns: { id: true },
+  })
+  if (!team) return { success: false, error: 'Équipe introuvable' }
+
+  await db.delete(teamManagers).where(
+    and(
+      eq(teamManagers.teamId, teamId),
+      eq(teamManagers.userId, managerId),
+      eq(teamManagers.clubId, clubId),
+    ),
+  )
 
   revalidatePath(`${REVALIDATE_TEAMS}/${teamId}`)
   revalidatePath(REVALIDATE_TEAMS)

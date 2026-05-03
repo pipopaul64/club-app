@@ -9,7 +9,9 @@ export type { UserRole }
 export type SessionUser = {
   id: string
   email: string
-  name: string
+  // nullable : un compte tout juste créé via invitation peut ne pas avoir de
+  // nom le temps que l'onboarding se termine.
+  name: string | null
   image?: string | null
   emailVerified: boolean
   clubId: string

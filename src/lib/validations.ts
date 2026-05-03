@@ -19,14 +19,9 @@ const phoneSchema = z
   .string()
   .regex(/^[+\d\s\-()\/.]{6,20}$/, 'Numéro de téléphone invalide')
 
-export const createUserSchema = z.object({
-  name: z.string().min(2, 'Nom trop court'),
-  email: z.string().email('Email invalide'),
-  phone: phoneSchema.optional().or(z.literal('')),
-  roles: userRolesSchema,
-  birthDate: z.string().optional(),
-})
-
+// Pas de createUserSchema : la création passe désormais par invitation +
+// auto-redemption (cf. invitations + onboarding). Seul updateUserSchema reste
+// — l'admin édite les rôles/infos d'un licencié existant.
 export const updateUserSchema = z.object({
   name: z.string().min(2, 'Nom trop court'),
   email: z.string().email('Email invalide'),
@@ -35,8 +30,48 @@ export const updateUserSchema = z.object({
   birthDate: z.string().optional(),
 })
 
-export type CreateUserInput = z.infer<typeof createUserSchema>
 export type UpdateUserInput = z.infer<typeof updateUserSchema>
+
+// ---------------------------------------------------------------------------
+// Invitations
+// ---------------------------------------------------------------------------
+/**
+ * Rôle proposé à l'invitation.
+ * 'user' = simple licencié ; 'manager' = également manager d'équipe(s).
+ * 'admin' n'est jamais invité — il faut promouvoir un licencié existant.
+ */
+export const invitedRoleSchema = z.enum(['user', 'manager'])
+
+export const createInvitationSchema = z.object({
+  email: z.string().email('Email invalide'),
+  invitedRole: invitedRoleSchema,
+})
+export type CreateInvitationInput = z.infer<typeof createInvitationSchema>
+
+/**
+ * Acceptation d'une invitation : nom + mot de passe.
+ * Le name est requis ici car Better-Auth signUpEmail l'exige.
+ */
+export const redeemInviteSchema = z.object({
+  name: z.string().min(2, 'Nom trop court'),
+  password: z.string().min(8, 'Mot de passe : 8 caractères minimum'),
+})
+export type RedeemInviteInput = z.infer<typeof redeemInviteSchema>
+
+/**
+ * Onboarding (post-redemption) : profil + équipes.
+ *  - teamMemberIds  = équipes où je joue (≥1 pour user simple, optionnel pour manager)
+ *  - teamManagerIds = équipes que je gère (≥1 pour manager, vide pour user simple)
+ * La validation conditionnelle min(1) selon le rôle est faite côté Server Action
+ * (le rôle vient de la session, pas du form).
+ */
+export const completeOnboardingSchema = z.object({
+  phone: phoneSchema.optional().or(z.literal('')),
+  birthDate: z.string().optional(),
+  teamMemberIds: z.array(z.string()).default([]),
+  teamManagerIds: z.array(z.string()).default([]),
+})
+export type CompleteOnboardingInput = z.infer<typeof completeOnboardingSchema>
 
 // ---------------------------------------------------------------------------
 // Équipes

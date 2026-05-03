@@ -7,8 +7,8 @@ import { createCotisation } from '@/app/dashboard/finance/actions'
 const initialState = { success: false as const, error: '' }
 
 interface ClubUser {
-  id: string
-  name: string
+  id:    string
+  name:  string | null
   email: string
 }
 
@@ -43,7 +43,7 @@ export function CotisationForm({ users }: { users: ClubUser[] }) {
           <option value="">— Sélectionner un licencié —</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>
-              {u.name} ({u.email})
+              {u.name ?? '(en attente)'} ({u.email})
             </option>
           ))}
         </select>

@@ -1,29 +1,30 @@
 'use client'
 
-import { useActionState, useEffect } from 'react'
+import { useActionState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ActionResult } from '@/types'
 
 type Manager = {
-  id: string
-  name: string
+  id:    string
+  name:  string | null
   roles: string[]
 }
 
 type Props = {
-  action: (prev: ActionResult, formData: FormData) => Promise<ActionResult>
+  action:   (prev: ActionResult, formData: FormData) => Promise<ActionResult>
   managers: Manager[]
-  currentManagerId?: string
 }
 
 const initialState: ActionResult = { success: false, error: '' }
 
-export function AssignManagerForm({ action, managers, currentManagerId }: Props) {
+export function AssignManagerForm({ action, managers }: Props) {
   const router = useRouter()
   const [state, formAction, pending] = useActionState(action, initialState)
+  const selectRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
     if (state.success) {
+      if (selectRef.current) selectRef.current.value = ''
       router.refresh()
     }
   }, [state.success, router])
@@ -38,29 +39,24 @@ export function AssignManagerForm({ action, managers, currentManagerId }: Props)
     <form action={formAction} className="flex gap-2 items-start">
       <div className="flex-1">
         <select
+          ref={selectRef}
           name="managerId"
-          defaultValue={currentManagerId ?? ''}
+          required
+          defaultValue=""
           className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
           style={inputStyle}
           onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
           onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
         >
-          <option value="">— Aucun manager —</option>
+          <option value="" disabled>Sélectionner un manager…</option>
           {managers.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.name}
+              {m.name ?? '(nom non défini)'}
             </option>
           ))}
         </select>
         {!state.success && state.error && (
-          <p className="text-xs mt-1" style={{ color: '#c0392b' }}>
-            {state.error}
-          </p>
-        )}
-        {state.success && (
-          <p className="text-xs mt-1" style={{ color: '#1a7a4a' }}>
-            Manager mis à jour
-          </p>
+          <p className="text-xs mt-1" style={{ color: '#c0392b' }}>{state.error}</p>
         )}
       </div>
       <button
@@ -69,7 +65,7 @@ export function AssignManagerForm({ action, managers, currentManagerId }: Props)
         className="px-4 py-2 text-sm font-medium rounded-lg text-white disabled:opacity-50 whitespace-nowrap"
         style={{ backgroundColor: '#8c60f3' }}
       >
-        {pending ? '…' : 'Assigner'}
+        {pending ? '…' : 'Ajouter'}
       </button>
     </form>
   )

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createConvocation } from '@/app/dashboard/convocations/actions'
 import type { ActionResult } from '@/types'
 
-type Player = { id: string; name: string }
+type Player = { id: string; name: string | null }
 
 type Props = {
   eventId: string
@@ -51,7 +51,7 @@ export function PlayerSelectForm({ eventId, players }: Props) {
               className="w-4 h-4 accent-violet-500"
             />
             <span className="text-sm font-medium" style={{ color: '#353148' }}>
-              {player.name}
+              {player.name ?? '?'}
             </span>
           </label>
         ))}

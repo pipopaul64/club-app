@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { messages, teams, teamMembers, users } from '@/db/schema'
 import { auth } from '@/lib/auth'
 import { checkRole } from '@/lib/check-role'
+import { isManagerOfTeam } from '@/lib/team-managers'
 import { createMessageSchema } from '@/lib/validations'
 import { eq, and, inArray, isNull, or, desc } from 'drizzle-orm'
 import { headers } from 'next/headers'
@@ -133,15 +134,7 @@ export async function createMessage(
     if (!teamId) {
       return { success: false, error: 'Sélectionnez une équipe' }
     }
-    const managedTeam = await db.query.teams.findFirst({
-      where: and(
-        eq(teams.id, teamId),
-        eq(teams.clubId, clubId),
-        eq(teams.managerId, userId),
-      ),
-      columns: { id: true },
-    })
-    if (!managedTeam) {
+    if (!(await isManagerOfTeam(userId, teamId))) {
       return { success: false, error: 'Vous ne gérez pas cette équipe' }
     }
   }
@@ -222,7 +215,7 @@ async function sendMessageNotification(params: {
   })
 
   // Destinataires : membres de l'équipe ou tous les licenciés du club
-  let recipients: { email: string; name: string }[] = []
+  let recipients: { email: string; name: string | null }[] = []
 
   if (teamId) {
     // Message d'équipe
@@ -266,7 +259,7 @@ async function sendMessageNotification(params: {
         html: `
           <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px">
             <h2 style="color:#353148;margin-bottom:4px">Nouveau message 💬</h2>
-            <p style="color:#353148">Bonjour ${name},</p>
+            <p style="color:#353148">Bonjour ${name ?? 'à toi'},</p>
             <p style="color:#353148">${authorName} vous a envoyé un message :</p>
             <div style="margin:16px 0;padding:16px;background:#f3f0ff;border-radius:8px;border-left:3px solid #8c60f3">
               <p style="color:#353148;margin:0;white-space:pre-wrap">${preview}</p>

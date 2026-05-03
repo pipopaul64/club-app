@@ -6,7 +6,7 @@
 export function generateWhatsAppText(
   event: { title: string; type: string; date: Date; location?: string | null },
   convocationList: Array<{
-    user: { name: string }
+    user: { name: string | null }
     isStarter: boolean | null
   }>,
 ): string {
@@ -40,19 +40,19 @@ export function generateWhatsAppText(
   if (hasComposition) {
     if (starters.length > 0) {
       msg += `\n👕 *Titulaires :*\n`
-      starters.forEach((c) => { msg += `• ${c.user.name}\n` })
+      starters.forEach((c) => { msg += `• ${(c.user.name ?? '?')}\n` })
     }
     if (substitutes.length > 0) {
       msg += `\n🔄 *Remplaçants :*\n`
-      substitutes.forEach((c) => { msg += `• ${c.user.name}\n` })
+      substitutes.forEach((c) => { msg += `• ${(c.user.name ?? '?')}\n` })
     }
     if (unassigned.length > 0) {
       msg += `\n👥 *Autres convoqués :*\n`
-      unassigned.forEach((c) => { msg += `• ${c.user.name}\n` })
+      unassigned.forEach((c) => { msg += `• ${(c.user.name ?? '?')}\n` })
     }
   } else {
     msg += `\n👥 *Joueurs convoqués :*\n`
-    convocationList.forEach((c) => { msg += `• ${c.user.name}\n` })
+    convocationList.forEach((c) => { msg += `• ${(c.user.name ?? '?')}\n` })
   }
 
   msg += `\nBonne chance ! 💪`

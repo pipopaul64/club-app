@@ -9,7 +9,7 @@ type Convocation = {
   userId: string
   isStarter: boolean | null
   status: string
-  user: { id: string; name: string }
+  user: { id: string; name: string | null }
 }
 
 type Props = {
@@ -46,7 +46,7 @@ export function CompositionForm({ eventId, convocations }: Props) {
             {/* Nom + statut */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate" style={{ color: '#353148' }}>
-                {conv.user.name}
+                {conv.user.name ?? '?'}
               </p>
               <span
                 className="text-xs font-medium px-1.5 py-0.5 rounded-full"

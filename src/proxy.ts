@@ -45,11 +45,13 @@ const ROUTE_RULES: RouteRule[] = [
   { pattern: /^\/$/, public: true },
   { pattern: /^\/login(\/.*)?$/, public: true },
   { pattern: /^\/register(\/.*)?$/, public: true },
+  { pattern: /^\/invite\//, public: true },
   { pattern: /^\/api\/auth\//, public: true },
   { pattern: /^\/api\/webhooks\//, public: true },
   { pattern: /^\/vitrine(\/.*)?$/, public: true },
   // Routes protégées — authentification requise (rôle vérifié dans les Server Actions)
   { pattern: /^\/dashboard/, requireAuth: true },
+  { pattern: /^\/onboarding/, requireAuth: true },
   { pattern: /^\/api\//, requireAuth: true },
 ]
 

@@ -1,10 +1,11 @@
 'use server'
 
 import { db } from '@/db'
-import { events, convocations, presences, performances, teams } from '@/db/schema'
+import { events, convocations, presences, performances } from '@/db/schema'
 import { auth } from '@/lib/auth'
 import { checkRole } from '@/lib/check-role'
-import { eq, and, inArray } from 'drizzle-orm'
+import { isManagerOfTeam } from '@/lib/team-managers'
+import { eq, and } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import type { ActionResult } from '@/types'
@@ -47,7 +48,7 @@ export type MatchStats = {
 
 export type SheetPlayer = {
   userId: string
-  name: string
+  name: string | null
   isStarter: boolean | null
   convocationId: string
   present: boolean | null   // null = pas encore marqué
@@ -78,12 +79,14 @@ export async function listMatchSheetData(eventId: string): Promise<SheetData | n
 
   const event = await db.query.events.findFirst({
     where: and(eq(events.id, eventId), eq(events.clubId, clubId)),
-    with: { team: { columns: { id: true, name: true, managerId: true } } },
+    with: { team: { columns: { id: true, name: true } } },
   })
   if (!event) return null
 
-  // Non-admin : vérifier accès à l'équipe
-  if (!roles.includes('admin') && event.team?.managerId !== userId) return null
+  // Non-admin : vérifier que l'utilisateur gère l'équipe de cet événement
+  if (!roles.includes('admin')) {
+    if (!event.teamId || !(await isManagerOfTeam(userId, event.teamId))) return null
+  }
 
   // Récupérer convocations + présences + performances en parallèle
   const [convocationList, presenceList, performanceList] = await Promise.all([
@@ -201,11 +204,13 @@ export async function saveMatchSheet(
 
   const event = await db.query.events.findFirst({
     where: and(eq(events.id, eventId), eq(events.clubId, clubId)),
-    with: { team: { columns: { id: true, managerId: true } } },
+    columns: { id: true, type: true, teamId: true },
   })
   if (!event) return { success: false, error: 'Événement introuvable' }
-  if (!roles.includes('admin') && event.team?.managerId !== userId) {
-    return { success: false, error: 'Accès refusé' }
+  if (!roles.includes('admin')) {
+    if (!event.teamId || !(await isManagerOfTeam(userId, event.teamId))) {
+      return { success: false, error: 'Accès refusé' }
+    }
   }
 
   // Récupérer la liste des joueurs convoqués depuis la DB (source de vérité)

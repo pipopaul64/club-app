@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import type { ActionResult } from '@/types'
 
 type Player = {
-  id: string
-  name: string
+  id:    string
+  name:  string | null
   roles: string[]
 }
 
@@ -62,7 +62,7 @@ export function AssignPlayerForm({ action, players }: Props) {
           </option>
           {players.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name}
+              {p.name ?? '(nom non défini)'}
             </option>
           ))}
         </select>

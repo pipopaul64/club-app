@@ -25,6 +25,7 @@ export const clubsRelations = relations(clubs, ({ many }) => ({
   users: many(users),
   teams: many(teams),
   teamMembers: many(teamMembers),
+  teamManagers: many(teamManagers),
   events: many(events),
   posts: many(posts),
   messages: many(messages),
@@ -32,6 +33,7 @@ export const clubsRelations = relations(clubs, ({ many }) => ({
   cotisations: many(cotisations),
   expenses: many(expenses),
   sponsors: many(sponsors),
+  invitations: many(invitations),
 }))
 
 // ---------------------------------------------------------------------------
@@ -54,7 +56,9 @@ export const users = pgTable(
     email: text('email').notNull(),
     emailVerified: boolean('email_verified').notNull().default(false),
     phone: text('phone'),
-    name: text('name').notNull(),
+    // nullable : Better-Auth créé via magic-link peut commencer sans nom ;
+    // l'utilisateur le saisit ensuite via /onboarding.
+    name: text('name'),
     image: text('image'),
     // Tableau additif : 'user' est toujours présent ; 'manager'/'admin' explicites.
     roles: text('roles')
@@ -63,6 +67,9 @@ export const users = pgTable(
       .notNull()
       .default(['user']),
     birthDate: timestamp('birth_date'),
+    // Timestamp de fin d'onboarding (équipes choisies, profil complété).
+    // null = onboarding en cours → le layout dashboard redirige vers /onboarding.
+    onboardingCompletedAt: timestamp('onboarding_completed_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
     deletedAt: timestamp('deleted_at'),
@@ -74,7 +81,7 @@ export const users = pgTable(
 
 export const usersRelations = relations(users, ({ one, many }) => ({
   club: one(clubs, { fields: [users.clubId], references: [clubs.id] }),
-  managedTeams: many(teams),
+  managedTeams: many(teamManagers),
   teamMemberships: many(teamMembers),
   convocations: many(convocations),
   presences: many(presences),
@@ -139,13 +146,12 @@ export const teams = pgTable('teams', {
   name: text('name').notNull(),
   category: text('category').notNull(),
   season: text('season').notNull(),
-  managerId: text('manager_id').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
   club: one(clubs, { fields: [teams.clubId], references: [clubs.id] }),
-  manager: one(users, { fields: [teams.managerId], references: [users.id] }),
+  managers: many(teamManagers),
   members: many(teamMembers),
   events: many(events),
   messages: many(messages),
@@ -179,6 +185,68 @@ export const teamMembersRelations = relations(teamMembers, ({ one }) => ({
   team: one(teams, { fields: [teamMembers.teamId], references: [teams.id] }),
   user: one(users, { fields: [teamMembers.userId], references: [users.id] }),
   club: one(clubs, { fields: [teamMembers.clubId], references: [clubs.id] }),
+}))
+
+// ---------------------------------------------------------------------------
+// team_managers — relation many-to-many : un manager peut gérer plusieurs
+// équipes ; une équipe peut avoir plusieurs managers (ex : coach + adjoint).
+// Indépendant de team_members (un manager peut aussi être joueur de la même
+// équipe via une ligne team_members séparée).
+// ---------------------------------------------------------------------------
+export const teamManagers = pgTable(
+  'team_managers',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clubId: text('club_id')
+      .notNull()
+      .references(() => clubs.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('team_managers_team_user_idx').on(t.teamId, t.userId),
+    index('team_managers_user_club_idx').on(t.userId, t.clubId),
+  ],
+)
+
+export const teamManagersRelations = relations(teamManagers, ({ one }) => ({
+  team: one(teams, { fields: [teamManagers.teamId], references: [teams.id] }),
+  user: one(users, { fields: [teamManagers.userId], references: [users.id] }),
+  club: one(clubs, { fields: [teamManagers.clubId], references: [clubs.id] }),
+}))
+
+// ---------------------------------------------------------------------------
+// invitations — magic-link token pour faire entrer un licencié dans le club.
+// Single-use par couple (clubId, email). Pas d'expiration : token reste valide
+// jusqu'à utilisation. L'admin peut révoquer (delete) avant.
+// ---------------------------------------------------------------------------
+export const invitations = pgTable(
+  'invitations',
+  {
+    id: text('id').primaryKey(),
+    clubId: text('club_id')
+      .notNull()
+      .references(() => clubs.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    // Rôle attribué dès l'acceptation. 'user' = simple licencié ; 'manager' =
+    // licencié + manager d'équipes (l'onboarding propose les deux pickers).
+    invitedRole: text('invited_role').$type<'user' | 'manager'>().notNull(),
+    token: text('token').notNull().unique(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    usedAt: timestamp('used_at'),
+  },
+  (t) => [
+    uniqueIndex('invitations_club_email_idx').on(t.clubId, t.email),
+  ],
+)
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  club: one(clubs, { fields: [invitations.clubId], references: [clubs.id] }),
 }))
 
 // ---------------------------------------------------------------------------
