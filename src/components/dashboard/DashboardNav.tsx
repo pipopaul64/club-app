@@ -29,50 +29,52 @@ type NavSection = {
 
 const SECTIONS: NavSection[] = [
   {
-    title: 'Mon espace',
+    title: 'Mon équipe',
+    // 'user' couvre tout le monde (rôle implicite). Seuls les managers
+    // verront les boutons de création (gérés au niveau des pages).
+    roles: ['user', 'manager'],
     items: [
       {
-        href:  '/dashboard/calendar',
+        href:  '/dashboard/team/calendar',
         icon:  '📅',
         label: 'Calendrier',
       },
       {
-        href:  '/dashboard/convocations',
-        icon:  '📨',
+        href:  '/dashboard/team/convocations',
+        icon:  '📣',
         label: 'Convocations',
-        also:  ['/dashboard/match-sheet'],
+        also:  ['/dashboard/team/match-sheet'],
       },
       {
-        href:  '/dashboard/content',
+        href:  '/dashboard/team/content',
         icon:  '💬',
         label: 'Messages',
-      },
-      {
-        href:  '/dashboard/surveys',
-        icon:  '🗳️',
-        label: 'Sondages',
       },
     ],
   },
   {
-    title: 'Mon équipe',
-    roles: ['manager'],
+    title: 'Mon club',
     items: [
       {
-        href:  '/dashboard/manager/events',
+        href:  '/dashboard/club/calendar',
         icon:  '📅',
-        label: 'Événements',
+        label: 'Calendrier',
       },
       {
-        href:  '/dashboard/manager/convocations',
-        icon:  '📣',
+        href:  '/dashboard/club/convocations',
+        icon:  '📨',
         label: 'Convocations',
-        also:  ['/dashboard/manager/match-sheet'],
+        also:  ['/dashboard/club/match-sheet'],
       },
       {
-        href:  '/dashboard/manager/content',
-        icon:  '📢',
+        href:  '/dashboard/club/content',
+        icon:  '💬',
         label: 'Messages',
+      },
+      {
+        href:  '/dashboard/club/surveys',
+        icon:  '🗳️',
+        label: 'Sondages',
       },
     ],
   },

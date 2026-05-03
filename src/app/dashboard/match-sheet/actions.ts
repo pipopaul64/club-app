@@ -265,7 +265,7 @@ export async function saveMatchSheet(
     }
   }
 
-  revalidatePath(`/dashboard/match-sheet/${eventId}`)
-  revalidatePath(`/dashboard/manager/match-sheet/${eventId}`)
+  revalidatePath(`/dashboard/club/match-sheet/${eventId}`)
+  revalidatePath(`/dashboard/team/match-sheet/${eventId}`)
   return { success: true, data: undefined }
 }

@@ -1,5 +1,8 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
+import { checkRole } from '@/lib/check-role'
 import {
   listConvocationsForEvent,
   listEligibleEvents,
@@ -19,6 +22,13 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 export default async function ConvocationDetailPage({ params }: Props) {
+  // Gestion des compositions : managers/admin uniquement.
+  // Les users voient les compteurs sur la liste /dashboard/team/convocations.
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) redirect('/login')
+  const ok = await checkRole(session.user.id, ['admin', 'manager'])
+  if (!ok) redirect('/dashboard/team/convocations')
+
   const { eventId } = await params
 
   // Récupérer les convocations + l'événement via listEligibleEvents
@@ -55,7 +65,7 @@ export default async function ConvocationDetailPage({ params }: Props) {
       {/* Header */}
       <div>
         <Link
-          href="/dashboard/manager/convocations/new"
+          href="/dashboard/team/convocations/new"
           className="text-sm hover:underline mb-2 inline-block"
           style={{ color: '#8e8a9c' }}
         >
@@ -99,7 +109,7 @@ export default async function ConvocationDetailPage({ params }: Props) {
 
           {/* Ajouter d'autres joueurs */}
           <Link
-            href={`/dashboard/manager/convocations/new?eventId=${eventId}`}
+            href={`/dashboard/team/convocations/new?eventId=${eventId}`}
             className="text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap"
             style={{ border: '1px solid #8c60f3', color: '#8c60f3' }}
           >
@@ -138,7 +148,7 @@ export default async function ConvocationDetailPage({ params }: Props) {
             Aucun joueur convoqué pour l&apos;instant.
           </p>
           <Link
-            href={`/dashboard/manager/convocations/new?eventId=${eventId}`}
+            href={`/dashboard/team/convocations/new?eventId=${eventId}`}
             className="mt-3 inline-block text-sm font-medium"
             style={{ color: '#8c60f3' }}
           >

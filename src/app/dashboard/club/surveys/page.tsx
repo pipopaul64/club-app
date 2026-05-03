@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { listSurveysForUser } from './actions'
+import { listSurveysForUser } from '@/app/dashboard/surveys/actions'
 import { SurveyResponseButtons } from './_components/SurveyResponseButtons'
 
 export default async function SurveysPage() {

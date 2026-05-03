@@ -35,7 +35,7 @@ type EventFormProps = {
   requireTeam?: boolean   // Manager Sportif doit choisir une équipe
   submitLabel: string
   cancelHref: string
-  redirectTo?: string     // Où rediriger après succès (défaut: /dashboard/calendar)
+  redirectTo?: string     // Où rediriger après succès (défaut: /dashboard/club/calendar)
 }
 
 const initialState: ActionResult = { success: false, error: '' }
@@ -47,7 +47,7 @@ export function EventForm({
   requireTeam = false,
   submitLabel,
   cancelHref,
-  redirectTo = '/dashboard/calendar',
+  redirectTo = '/dashboard/club/calendar',
 }: EventFormProps) {
   const router = useRouter()
   const [state, formAction, pending] = useActionState(action, initialState)

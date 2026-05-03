@@ -1,5 +1,8 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
+import { checkRole } from '@/lib/check-role'
 import { listMatchSheetData } from '@/app/dashboard/match-sheet/actions'
 import { PresenceMatchForm } from './_components/PresenceMatchForm'
 
@@ -14,6 +17,13 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 export default async function ManagerMatchSheetPage({ params }: Props) {
+  // Saisie de la feuille de match : managers/admin uniquement.
+  // Les users voient les stats sur /dashboard/club/match-sheet/[eventId].
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) redirect('/login')
+  const ok = await checkRole(session.user.id, ['admin', 'manager'])
+  if (!ok) redirect('/dashboard/team/convocations')
+
   const { eventId } = await params
   const data = await listMatchSheetData(eventId)
   if (!data) notFound()
@@ -40,7 +50,7 @@ export default async function ManagerMatchSheetPage({ params }: Props) {
       {/* Header */}
       <div>
         <Link
-          href={`/dashboard/manager/convocations/${eventId}`}
+          href={`/dashboard/team/convocations/${eventId}`}
           className="text-sm hover:underline mb-2 inline-block"
           style={{ color: '#8e8a9c' }}
         >
@@ -110,7 +120,7 @@ export default async function ManagerMatchSheetPage({ params }: Props) {
             Aucun joueur convoqué pour cet événement.
           </p>
           <Link
-            href={`/dashboard/manager/convocations/new?eventId=${eventId}`}
+            href={`/dashboard/team/convocations/new?eventId=${eventId}`}
             className="mt-3 inline-block text-sm font-medium"
             style={{ color: '#8c60f3' }}
           >

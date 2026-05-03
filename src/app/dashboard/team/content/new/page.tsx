@@ -10,7 +10,10 @@ import { redirect } from 'next/navigation'
 import { ContentForm } from './_components/ContentForm'
 import type { UserRole } from '@/db/schema'
 
-export default async function NewContentPage() {
+type Props = { searchParams: Promise<{ teamId?: string }> }
+
+export default async function NewContentPage({ searchParams }: Props) {
+  const { teamId: requestedTeamId } = await searchParams
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) redirect('/login')
 
@@ -52,7 +55,7 @@ export default async function NewContentPage() {
       <div className="p-6 max-w-2xl mx-auto space-y-6">
         <div>
           <Link
-            href="/dashboard/manager/content"
+            href="/dashboard/team/content"
             className="text-sm hover:underline mb-2 inline-block"
             style={{ color: '#8e8a9c' }}
           >
@@ -74,16 +77,19 @@ export default async function NewContentPage() {
     )
   }
 
-  const defaultTeamId = !isAdmin && availableTeams.length === 1
-    ? availableTeams[0].id
-    : undefined
+  // Pré-sélection : ?teamId=X si valide, sinon une seule équipe → cette équipe
+  const defaultTeamId =
+    (requestedTeamId && availableTeams.some((t) => t.id === requestedTeamId)
+      ? requestedTeamId
+      : undefined)
+    ?? (!isAdmin && availableTeams.length === 1 ? availableTeams[0].id : undefined)
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <Link
-          href="/dashboard/manager/content"
+          href="/dashboard/team/content"
           className="text-sm hover:underline mb-2 inline-block"
           style={{ color: '#8e8a9c' }}
         >

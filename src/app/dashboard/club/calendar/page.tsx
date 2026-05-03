@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { listEvents, listAccessibleTeams } from '@/app/dashboard/events/actions'
 import { TeamFilter } from '@/app/dashboard/events/_components/TeamFilter'
 import { TypeFilter } from '@/app/dashboard/events/_components/TypeFilter'
-import type { UserRole, EventType } from '@/db/schema'
+import type { EventType } from '@/db/schema'
 
 // ===========================================================================
 // CONSTANTES
@@ -91,7 +91,7 @@ function calUrl(params: {
   if (params.teamId) p.set('teamId', params.teamId)
   if (params.type) p.set('type', params.type)
   const s = p.toString()
-  return s ? `/dashboard/calendar?${s}` : '/dashboard/calendar'
+  return s ? `/dashboard/club/calendar?${s}` : '/dashboard/club/calendar'
 }
 
 // ===========================================================================
@@ -107,22 +107,9 @@ const EVENT_COLORS: Record<EventType, { color: string; bg: string; label: string
 // ===========================================================================
 // COMPOSANTS PARTAGÉS
 // ===========================================================================
-
-function AddEventLink({ roles }: { roles: UserRole[] }) {
-  if (!roles.includes('admin') && !roles.includes('manager')) return null
-  const href = roles.includes('admin')
-    ? '/dashboard/admin/events/new'
-    : '/dashboard/manager/events/new'
-  return (
-    <Link
-      href={href}
-      className="px-4 py-2 text-sm font-medium rounded-lg text-white whitespace-nowrap"
-      style={{ backgroundColor: '#8c60f3' }}
-    >
-      + Ajouter un événement
-    </Link>
-  )
-}
+// Note : /dashboard/club/calendar est en lecture seule. Les boutons de
+// création (admin/manager) sont sur leurs sections dédiées
+// (/dashboard/admin/events/new, /dashboard/team/calendar/new).
 
 function ViewSwitcher({
   view, month, date, teamId, type,
@@ -449,7 +436,6 @@ export default async function CalendarPage({ searchParams }: Props) {
     redirect('/login')
   }
   if (!session) redirect('/login')
-  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
 
   // Plage de dates pour la requête
   const dateRange =
@@ -574,9 +560,6 @@ export default async function CalendarPage({ searchParams }: Props) {
           <Suspense>
             <TypeFilter currentType={type} />
           </Suspense>
-          <div className="ml-auto">
-            <AddEventLink roles={roles} />
-          </div>
         </div>
       </div>
 

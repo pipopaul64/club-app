@@ -178,9 +178,55 @@ export async function listMyConvocations() {
 }
 
 // ---------------------------------------------------------------------------
+// listTeamEventsSummary — événements d'UNE équipe (passés 60 j + à venir)
+// avec le nombre de convocations. Accessible aux membres + managers + admin
+// de l'équipe. Utilisé par /dashboard/team/convocations (lecture pour user,
+// gestion pour manager/admin).
+// ---------------------------------------------------------------------------
+export async function listTeamEventsSummary(teamId: string) {
+  const { userId, clubId, roles } = await getSessionContext()
+
+  // Vérifier que l'utilisateur a une relation avec cette équipe
+  const team = await db.query.teams.findFirst({
+    where:   and(eq(teams.id, teamId), eq(teams.clubId, clubId)),
+    columns: { id: true },
+  })
+  if (!team) throw new Error('Équipe introuvable')
+
+  if (!roles.includes('admin')) {
+    const [membership, isManager] = await Promise.all([
+      db.query.teamMembers.findFirst({
+        where:   and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)),
+        columns: { id: true },
+      }),
+      isManagerOfTeam(userId, teamId),
+    ])
+    if (!membership && !isManager) {
+      throw new Error("Vous n'avez pas accès à cette équipe")
+    }
+  }
+
+  const since = new Date()
+  since.setDate(since.getDate() - 60)
+
+  return db.query.events.findMany({
+    where: and(
+      eq(events.clubId, clubId),
+      gte(events.date, since),
+      eq(events.teamId, teamId),
+    ),
+    with: {
+      team:         { columns: { id: true, name: true } },
+      convocations: { columns: { id: true } },
+    },
+    orderBy: (e, { desc }) => [desc(e.date)],
+  })
+}
+
+// ---------------------------------------------------------------------------
 // listManagerEventsSummary — tous les événements des équipes du manager
 // (passés 60 j + à venir) avec le nombre de convocations par événement.
-// Utilisé par la page liste /dashboard/manager/convocations
+// (Conservé pour compat éventuelle ; non utilisé directement.)
 // ---------------------------------------------------------------------------
 export async function listManagerEventsSummary() {
   const { userId, clubId, roles } = await requireManagerAuth()
@@ -303,8 +349,9 @@ export async function createConvocation(
     // Échec silencieux
   }
 
-  revalidatePath('/dashboard/convocations')
-  revalidatePath(`/dashboard/manager/convocations/${parsed.data.eventId}`)
+  revalidatePath('/dashboard/club/convocations')
+  revalidatePath('/dashboard/team/convocations')
+  revalidatePath(`/dashboard/team/convocations/${parsed.data.eventId}`)
   return { success: true, data: { eventId: parsed.data.eventId } }
 }
 
@@ -345,7 +392,7 @@ export async function updateComposition(
     }),
   )
 
-  revalidatePath(`/dashboard/manager/convocations/${eventId}`)
+  revalidatePath(`/dashboard/team/convocations/${eventId}`)
   return { success: true, data: undefined }
 }
 
@@ -376,8 +423,9 @@ export async function removeFromConvocation(
 
   await db.delete(convocations).where(eq(convocations.id, convocationId))
 
-  revalidatePath(`/dashboard/manager/convocations/${conv.event.id}`)
-  revalidatePath('/dashboard/convocations')
+  revalidatePath(`/dashboard/team/convocations/${conv.event.id}`)
+  revalidatePath('/dashboard/team/convocations')
+  revalidatePath('/dashboard/club/convocations')
   return { success: true, data: undefined }
 }
 
@@ -398,7 +446,8 @@ export async function updateConvocationStatus(
       and(eq(convocations.id, convocationId), eq(convocations.userId, userId)),
     )
 
-  revalidatePath('/dashboard/convocations')
+  revalidatePath('/dashboard/club/convocations')
+  revalidatePath('/dashboard/team/convocations')
 }
 
 // ===========================================================================

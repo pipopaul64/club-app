@@ -34,7 +34,7 @@ export function EventSelect({ events, currentEventId }: Props) {
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     if (e.target.value) {
-      router.push(`/dashboard/manager/convocations/new?eventId=${e.target.value}`)
+      router.push(`/dashboard/team/convocations/new?eventId=${e.target.value}`)
     }
   }
 

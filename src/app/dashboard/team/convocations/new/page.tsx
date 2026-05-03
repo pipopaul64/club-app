@@ -1,7 +1,11 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
+import { checkRole } from '@/lib/check-role'
 import { listEligibleEvents, listAvailablePlayers } from '@/app/dashboard/convocations/actions'
-import { EventSelect } from '@/app/dashboard/manager/convocations/_components/EventSelect'
-import { PlayerSelectForm } from '@/app/dashboard/manager/convocations/_components/PlayerSelectForm'
+import { EventSelect } from '@/app/dashboard/team/convocations/_components/EventSelect'
+import { PlayerSelectForm } from '@/app/dashboard/team/convocations/_components/PlayerSelectForm'
 
 type Props = {
   searchParams: Promise<{ eventId?: string }>
@@ -14,6 +18,11 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 export default async function NewConvocationPage({ searchParams }: Props) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) redirect('/login')
+  const ok = await checkRole(session.user.id, ['admin', 'manager'])
+  if (!ok) redirect('/dashboard/team/convocations')
+
   const { eventId } = await searchParams
 
   const eligibleEvents = await listEligibleEvents()
@@ -30,11 +39,11 @@ export default async function NewConvocationPage({ searchParams }: Props) {
       {/* Header */}
       <div className="mb-6">
         <Link
-          href="/dashboard/calendar"
+          href="/dashboard/team/convocations"
           className="text-sm hover:underline mb-2 inline-block"
           style={{ color: '#8e8a9c' }}
         >
-          ← Retour au calendrier
+          ← Retour aux convocations
         </Link>
         <h1 className="text-2xl font-bold" style={{ color: '#353148' }}>
           Nouvelle convocation

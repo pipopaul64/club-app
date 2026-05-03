@@ -74,7 +74,46 @@ export async function listMyTeamMessages() {
 }
 
 // ---------------------------------------------------------------------------
-// listManagerMessages — messages publiés par le manager connecté
+// listTeamMessages — tous les messages adressés à UNE équipe (et messages
+// club-wide). Accessible aux membres + managers + admin de cette équipe.
+// Utilisé par /dashboard/team/content.
+// ---------------------------------------------------------------------------
+export async function listTeamMessages(teamId: string) {
+  const { userId, clubId, roles } = await getSessionContext()
+
+  // Vérifier que l'équipe appartient au club
+  const team = await db.query.teams.findFirst({
+    where:   and(eq(teams.id, teamId), eq(teams.clubId, clubId)),
+    columns: { id: true },
+  })
+  if (!team) throw new Error('Équipe introuvable')
+
+  // Permission : admin OK, sinon il faut être membre ou manager de l'équipe
+  if (!roles.includes('admin')) {
+    const [membership, isManager] = await Promise.all([
+      db.query.teamMembers.findFirst({
+        where:   and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)),
+        columns: { id: true },
+      }),
+      isManagerOfTeam(userId, teamId),
+    ])
+    if (!membership && !isManager) {
+      throw new Error("Vous n'avez pas accès à cette équipe")
+    }
+  }
+
+  return db.query.messages.findMany({
+    where:   and(eq(messages.clubId, clubId), eq(messages.teamId, teamId)),
+    with: {
+      author: { columns: { id: true, name: true } },
+      team:   { columns: { id: true, name: true } },
+    },
+    orderBy: (m, { desc }) => [desc(m.createdAt)],
+  })
+}
+
+// ---------------------------------------------------------------------------
+// listManagerMessages — messages publiés par le manager connecté (legacy)
 // ---------------------------------------------------------------------------
 export async function listManagerMessages() {
   const { userId, clubId, roles } = await requireManagerAuth()
@@ -165,8 +204,8 @@ export async function createMessage(
     // Échec silencieux
   }
 
-  revalidatePath('/dashboard/content')
-  revalidatePath('/dashboard/manager/content')
+  revalidatePath('/dashboard/club/content')
+  revalidatePath('/dashboard/team/content')
   return { success: true, data: undefined }
 }
 
@@ -189,8 +228,8 @@ export async function deleteMessage(messageId: string): Promise<ActionResult> {
 
   await db.delete(messages).where(eq(messages.id, messageId))
 
-  revalidatePath('/dashboard/content')
-  revalidatePath('/dashboard/manager/content')
+  revalidatePath('/dashboard/club/content')
+  revalidatePath('/dashboard/team/content')
   return { success: true, data: undefined }
 }
 

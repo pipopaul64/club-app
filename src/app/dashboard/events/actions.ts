@@ -13,7 +13,7 @@ import type { ActionResult } from '@/types'
 import type { EventType, UserRole } from '@/db/schema'
 import type { SQL } from 'drizzle-orm'
 
-const REVALIDATE = '/dashboard/calendar'
+const REVALIDATE = '/dashboard/club/calendar'
 
 // ---------------------------------------------------------------------------
 // Helpers locaux — même pattern que admin/actions.ts (auth.api.getSession direct)
@@ -165,7 +165,7 @@ export async function listAdminEvents() {
 
 // ---------------------------------------------------------------------------
 // listManagerEvents — événements des équipes gérées (passés 60j + à venir)
-// Réservé au Manager Sportif pour la vue liste /dashboard/manager/events
+// Réservé au Manager Sportif pour la vue liste /dashboard/team/calendar
 // ---------------------------------------------------------------------------
 export async function listManagerEvents() {
   const { user, clubId, roles } = await requireEventAuth(['admin', 'manager'])

@@ -24,7 +24,7 @@ export function ContentForm({ teams, isAdmin, defaultTeamId }: Props) {
 
   useEffect(() => {
     if (state.success) {
-      router.push('/dashboard/manager/content')
+      router.push('/dashboard/team/content')
     }
   }, [state.success, router])
 

@@ -1,8 +1,20 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
+import { checkRole } from '@/lib/check-role'
 import { createEvent, listEventFormTeams } from '@/app/dashboard/events/actions'
 import { EventForm } from '@/app/dashboard/events/_components/EventForm'
 
-export default async function ManagerNewEventPage() {
+type Props = { searchParams: Promise<{ teamId?: string }> }
+
+export default async function NewTeamEventPage({ searchParams }: Props) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) redirect('/login')
+  const ok = await checkRole(session.user.id, ['admin', 'manager'])
+  if (!ok) redirect('/dashboard/team/calendar')
+
+  const { teamId: preselectedTeamId } = await searchParams
   const teams = await listEventFormTeams()
 
   return (
@@ -10,11 +22,11 @@ export default async function ManagerNewEventPage() {
       {/* Header */}
       <div className="mb-6">
         <Link
-          href="/dashboard/manager/events"
+          href="/dashboard/team/calendar"
           className="text-sm hover:underline mb-2 inline-block"
           style={{ color: '#8e8a9c' }}
         >
-          ← Retour aux événements
+          ← Retour au calendrier
         </Link>
         <h1 className="text-2xl font-bold" style={{ color: '#353148' }}>
           Nouvel événement
@@ -45,9 +57,14 @@ export default async function ManagerNewEventPage() {
             action={createEvent}
             teams={teams}
             requireTeam={true}
+            defaultValues={
+              preselectedTeamId && teams.some((t) => t.id === preselectedTeamId)
+                ? { teamId: preselectedTeamId }
+                : undefined
+            }
             submitLabel="Créer l'événement"
-            cancelHref="/dashboard/manager/events"
-            redirectTo="/dashboard/manager/events"
+            cancelHref="/dashboard/team/calendar"
+            redirectTo="/dashboard/team/calendar"
           />
         </div>
       )}

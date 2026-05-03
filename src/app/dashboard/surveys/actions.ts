@@ -120,7 +120,7 @@ export async function createSurvey(
   })
 
   revalidatePath('/dashboard/admin/surveys')
-  revalidatePath('/dashboard/surveys')
+  revalidatePath('/dashboard/club/surveys')
   return { success: true, data: undefined }
 }
 
@@ -137,7 +137,7 @@ export async function deleteSurvey(surveyId: string): Promise<ActionResult> {
   await db.delete(surveys).where(and(eq(surveys.id, surveyId), eq(surveys.clubId, clubId)))
 
   revalidatePath('/dashboard/admin/surveys')
-  revalidatePath('/dashboard/surveys')
+  revalidatePath('/dashboard/club/surveys')
   return { success: true, data: undefined }
 }
 
@@ -187,6 +187,6 @@ export async function respondToSurvey(
     })
   }
 
-  revalidatePath('/dashboard/surveys')
+  revalidatePath('/dashboard/club/surveys')
   return { success: true, data: undefined }
 }

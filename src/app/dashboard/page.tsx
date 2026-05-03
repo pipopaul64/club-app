@@ -36,16 +36,16 @@ export default async function DashboardPage() {
 
 function QuickLinks({ roles }: { roles: string[] }) {
   const links: { href: string; icon: string; title: string; desc: string }[] = [
-    { href: '/dashboard/calendar',    icon: '📅', title: 'Calendrier',   desc: 'Voir les événements du club' },
-    { href: '/dashboard/convocations', icon: '📨', title: 'Convocations', desc: 'Mes convocations et présences' },
-    { href: '/dashboard/content',     icon: '💬', title: 'Messages',     desc: 'Messages de mon équipe' },
-    { href: '/dashboard/surveys',     icon: '🗳️', title: 'Sondages',     desc: 'Répondre aux sondages en cours' },
+    { href: '/dashboard/club/calendar',     icon: '📅', title: 'Calendrier',   desc: 'Voir les événements du club' },
+    { href: '/dashboard/club/convocations', icon: '📨', title: 'Convocations', desc: 'Mes convocations et présences' },
+    { href: '/dashboard/club/content',      icon: '💬', title: 'Messages',     desc: 'Messages du club' },
+    { href: '/dashboard/club/surveys',      icon: '🗳️', title: 'Sondages',     desc: 'Répondre aux sondages en cours' },
   ]
 
   if (roles.includes('manager')) {
     links.push(
-      { href: '/dashboard/manager/convocations',       icon: '📣', title: 'Gérer convocations', desc: "Convoquer et composer l'équipe" },
-      { href: '/dashboard/manager/content',            icon: '📢', title: 'Envoyer un message', desc: 'Communiquer avec l\'équipe' },
+      { href: '/dashboard/team/convocations', icon: '📣', title: 'Gérer convocations', desc: "Convoquer et composer l'équipe" },
+      { href: '/dashboard/team/content',      icon: '📢', title: 'Envoyer un message', desc: "Communiquer avec l'équipe" },
     )
   }
 

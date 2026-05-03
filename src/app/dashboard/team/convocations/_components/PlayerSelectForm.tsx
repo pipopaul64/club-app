@@ -20,7 +20,7 @@ export function PlayerSelectForm({ eventId, players }: Props) {
 
   useEffect(() => {
     if (state.success && state.data?.eventId) {
-      router.push(`/dashboard/manager/convocations/${state.data.eventId}`)
+      router.push(`/dashboard/team/convocations/${state.data.eventId}`)
     }
   }, [state, router])
 
