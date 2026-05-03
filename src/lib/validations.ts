@@ -119,3 +119,56 @@ export const createSurveySchema = z.object({
 })
 
 export type CreateSurveyInput = z.infer<typeof createSurveySchema>
+
+// ---------------------------------------------------------------------------
+// Finance — Cotisations
+// ---------------------------------------------------------------------------
+export const cotisationStatusSchema = z.enum(['pending', 'paid', 'late'])
+
+export const createCotisationSchema = z.object({
+  userId:  z.string().min(1, 'Licencié requis'),
+  amount:  z.coerce.number().positive('Montant requis').max(99999, 'Montant trop élevé'),
+  dueDate: z.string().min(1, "Date d'échéance requise"),
+})
+
+export type CreateCotisationInput = z.infer<typeof createCotisationSchema>
+
+// ---------------------------------------------------------------------------
+// Finance — Dépenses
+// ---------------------------------------------------------------------------
+export const expenseCategorySchema = z.enum([
+  'equipement',
+  'deplacement',
+  'arbitrage',
+  'licence',
+  'communication',
+  'autre',
+])
+
+export const createExpenseSchema = z.object({
+  amount:      z.coerce.number().positive('Montant requis').max(999999, 'Montant trop élevé'),
+  category:    expenseCategorySchema,
+  description: z.string().max(500, 'Description trop longue').optional(),
+  receiptUrl:  z.string().url('URL invalide').optional().or(z.literal('')),
+})
+
+export const updateExpenseSchema = createExpenseSchema
+
+export type CreateExpenseInput = z.infer<typeof createExpenseSchema>
+export type UpdateExpenseInput = z.infer<typeof updateExpenseSchema>
+
+// ---------------------------------------------------------------------------
+// Finance — Sponsors
+// ---------------------------------------------------------------------------
+export const createSponsorSchema = z.object({
+  name:      z.string().min(2, 'Nom trop court'),
+  amount:    z.coerce.number().positive('Montant requis').max(9999999, 'Montant trop élevé'),
+  startDate: z.string().min(1, 'Date de début requise'),
+  endDate:   z.string().optional(),
+  notes:     z.string().max(1000, 'Notes trop longues').optional(),
+})
+
+export const updateSponsorSchema = createSponsorSchema
+
+export type CreateSponsorInput = z.infer<typeof createSponsorSchema>
+export type UpdateSponsorInput = z.infer<typeof updateSponsorSchema>
