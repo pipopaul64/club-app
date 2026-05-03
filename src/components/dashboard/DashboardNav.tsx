@@ -82,6 +82,12 @@ const SECTIONS: NavSection[] = [
     roles: ['manager_associatif', 'admin'],
     items: [
       {
+        href:  '/dashboard/manager-associatif/events',
+        icon:  '📅',
+        label: 'Événements',
+        also:  ['/dashboard/manager-associatif/events'],
+      },
+      {
         href:  '/dashboard/manager-associatif/expenses',
         icon:  '📤',
         label: 'Mes dépenses',

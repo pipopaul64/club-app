@@ -172,3 +172,13 @@ export const updateSponsorSchema = createSponsorSchema
 
 export type CreateSponsorInput = z.infer<typeof createSponsorSchema>
 export type UpdateSponsorInput = z.infer<typeof updateSponsorSchema>
+
+// ---------------------------------------------------------------------------
+// Événements associatifs — Tâches
+// ---------------------------------------------------------------------------
+export const createEventTaskSchema = z.object({
+  title:      z.string().min(1, 'La tâche ne peut pas être vide').max(200, 'Titre trop long'),
+  assigneeId: z.string().optional(),
+})
+
+export type CreateEventTaskInput = z.infer<typeof createEventTaskSchema>
