@@ -6,7 +6,7 @@ import { auth } from '@/lib/auth'
 import { checkRole } from '@/lib/check-role'
 import { hasRole } from '@/lib/roles'
 import { createUserSchema, updateUserSchema, createTeamSchema, updateTeamSchema } from '@/lib/validations'
-import { eq, and, isNull, inArray, notInArray } from 'drizzle-orm'
+import { eq, and, isNull, inArray, notInArray, count } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import type { ActionResult } from '@/types'
@@ -33,24 +33,38 @@ async function getAdminContext() {
 }
 
 // ---------------------------------------------------------------------------
-// listUsers — lecture seule, filtre clubId + soft delete
+// listUsers — lecture seule, filtre clubId + soft delete, avec pagination
 // ---------------------------------------------------------------------------
-export async function listUsers() {
+const USERS_PER_PAGE = 20
+
+export async function listUsers(page = 1) {
   const { clubId } = await getAdminContext()
 
-  return db.query.users.findMany({
-    where: and(eq(users.clubId, clubId), isNull(users.deletedAt)),
-    columns: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      role: true,
-      birthDate: true,
-      createdAt: true,
-    },
-    orderBy: (u, { asc }) => [asc(u.name)],
-  })
+  const offset = (Math.max(1, page) - 1) * USERS_PER_PAGE
+
+  const [rows, [{ total }]] = await Promise.all([
+    db.query.users.findMany({
+      where: and(eq(users.clubId, clubId), isNull(users.deletedAt)),
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        birthDate: true,
+        createdAt: true,
+      },
+      orderBy: (u, { asc }) => [asc(u.name)],
+      limit: USERS_PER_PAGE,
+      offset,
+    }),
+    db
+      .select({ total: count() })
+      .from(users)
+      .where(and(eq(users.clubId, clubId), isNull(users.deletedAt))),
+  ])
+
+  return { rows, total, totalPages: Math.max(1, Math.ceil(total / USERS_PER_PAGE)) }
 }
 
 // ---------------------------------------------------------------------------

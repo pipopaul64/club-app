@@ -162,9 +162,11 @@ function canSeeSection(section: NavSection, role: UserRole): boolean {
 interface Props {
   role: UserRole
   userName: string
+  /** Called when any nav link is clicked — used by DashboardShell to close the mobile drawer */
+  onNavigate?: () => void
 }
 
-export function DashboardNav({ role, userName }: Props) {
+export function DashboardNav({ role, userName, onNavigate }: Props) {
   const pathname = usePathname()
 
   function isActive(item: NavItem): boolean {
@@ -182,6 +184,7 @@ export function DashboardNav({ role, userName }: Props) {
       {/* Logo */}
       <Link
         href="/dashboard"
+        onClick={onNavigate}
         className="px-5 py-4 flex items-center gap-2 flex-shrink-0 hover:opacity-80 transition-opacity"
         style={{ borderBottom: '1px solid #e4e0ec' }}
       >
@@ -211,6 +214,7 @@ export function DashboardNav({ role, userName }: Props) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={onNavigate}
                     className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
                     style={
                       active

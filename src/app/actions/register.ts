@@ -3,7 +3,9 @@
 import { db } from '@/db'
 import { clubs, users } from '@/db/schema'
 import { auth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rate-limit'
 import { eq } from 'drizzle-orm'
+import { headers } from 'next/headers'
 import { z } from 'zod'
 import type { ActionResult } from '@/types'
 
@@ -27,6 +29,17 @@ function toSlug(name: string): string {
 export async function registerClub(
   formData: FormData,
 ): Promise<ActionResult<{ redirect: string }>> {
+  // Rate limit: 5 creations per IP per 15 minutes
+  const headersList = await headers()
+  const ip =
+    headersList.get('x-forwarded-for')?.split(',')[0].trim() ??
+    headersList.get('x-real-ip') ??
+    'anonymous'
+  const allowed = checkRateLimit(`register:${ip}`, 5, 15 * 60 * 1000)
+  if (!allowed) {
+    return { success: false, error: 'Trop de tentatives. Réessayez dans 15 minutes.' }
+  }
+
   const parsed = registerSchema.safeParse({
     clubName: formData.get('clubName'),
     firstName: formData.get('firstName'),
