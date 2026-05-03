@@ -10,11 +10,11 @@ export default async function AdminNewEventPage() {
       {/* Header */}
       <div className="mb-6">
         <Link
-          href="/dashboard/calendar"
+          href="/dashboard/admin/events"
           className="text-sm hover:underline mb-2 inline-block"
           style={{ color: '#8e8a9c' }}
         >
-          ← Retour au calendrier
+          ← Retour aux événements
         </Link>
         <h1 className="text-2xl font-bold" style={{ color: '#353148' }}>
           Nouvel événement
@@ -33,7 +33,8 @@ export default async function AdminNewEventPage() {
           teams={teams}
           requireTeam={false}
           submitLabel="Créer l'événement"
-          cancelHref="/dashboard/calendar"
+          cancelHref="/dashboard/admin/events"
+          redirectTo="/dashboard/admin/events"
         />
       </div>
     </div>

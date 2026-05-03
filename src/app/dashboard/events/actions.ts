@@ -144,6 +144,56 @@ export async function listAccessibleTeams() {
 }
 
 // ---------------------------------------------------------------------------
+// listAdminEvents — tous les événements du club (passés 60j + à venir)
+// Réservé à l'Admin pour la vue liste /dashboard/admin/events
+// ---------------------------------------------------------------------------
+export async function listAdminEvents() {
+  const { clubId } = await requireEventAuth(['admin'])
+
+  const since = new Date()
+  since.setDate(since.getDate() - 60)
+
+  return db.query.events.findMany({
+    where: and(eq(events.clubId, clubId), gte(events.date, since)),
+    with: {
+      team: { columns: { id: true, name: true } },
+    },
+    orderBy: (e, { desc }) => [desc(e.date)],
+  })
+}
+
+// ---------------------------------------------------------------------------
+// listManagerEvents — événements des équipes gérées (passés 60j + à venir)
+// Réservé au Manager Sportif pour la vue liste /dashboard/manager/events
+// ---------------------------------------------------------------------------
+export async function listManagerEvents() {
+  const { user, clubId, role } = await requireEventAuth(['admin', 'manager_sportif'])
+
+  const since = new Date()
+  since.setDate(since.getDate() - 60)
+
+  // Admin voit tout ; manager_sportif ne voit que ses équipes
+  let teamCondition = undefined
+  if (role === 'manager_sportif') {
+    const managedTeams = await db.query.teams.findMany({
+      where: and(eq(teams.managerId, user.id), eq(teams.clubId, clubId)),
+      columns: { id: true },
+    })
+    const teamIds = managedTeams.map((t) => t.id)
+    if (teamIds.length === 0) return []
+    teamCondition = inArray(events.teamId, teamIds)
+  }
+
+  return db.query.events.findMany({
+    where: and(eq(events.clubId, clubId), gte(events.date, since), teamCondition),
+    with: {
+      team: { columns: { id: true, name: true } },
+    },
+    orderBy: (e, { desc }) => [desc(e.date)],
+  })
+}
+
+// ---------------------------------------------------------------------------
 // listEventFormTeams — pour le formulaire de création
 // ---------------------------------------------------------------------------
 export async function listEventFormTeams() {

@@ -59,10 +59,9 @@ const SECTIONS: NavSection[] = [
     roles: ['manager_sportif', 'admin'],
     items: [
       {
-        href:  '/dashboard/manager/events/new',
+        href:  '/dashboard/manager/events',
         icon:  '📅',
         label: 'Événements',
-        also:  ['/dashboard/manager/events'],
       },
       {
         href:  '/dashboard/manager/convocations',
@@ -99,10 +98,9 @@ const SECTIONS: NavSection[] = [
     roles: ['admin'],
     items: [
       {
-        href:  '/dashboard/admin/events/new',
+        href:  '/dashboard/admin/events',
         icon:  '📅',
         label: 'Événements',
-        also:  ['/dashboard/admin/events'],
       },
       {
         href:  '/dashboard/admin/users',
