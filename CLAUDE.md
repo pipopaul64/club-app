@@ -7,7 +7,7 @@ Tu es un senior full-stack developer spécialisé en applications SaaS avec auth
 ClubOS — Application SaaS de gestion de club sportif.
 Cible : clubs amateurs (football, rugby, basket...).
 Multi-tenant : 1 club = 1 tenant.
-Rôles : User / Manager Sportif / Manager Associatif / Admin.
+Rôles (additifs, sans hiérarchie) : User (implicite) / Manager / Admin.
 Auth principale : Email (magic link ou mot de passe) via Better-Auth.
 
 ## Documentation
@@ -37,7 +37,6 @@ NEXT_PUBLIC_APP_URL=
 ```bash
 npm run dev        # Dev server (port 3001)
 npm run build      # Build production
-npm run lint       # ESLint
 npm run test       # Vitest
 npm run db:push    # Push schema to DB
 npm run db:studio  # Open Drizzle Studio
@@ -77,8 +76,14 @@ npm run db:studio  # Open Drizzle Studio
   ```
 - Vérification de rôle dans chaque Server Action :
   ```typescript
-  const hasRole = await checkRole(session.user.id, ['admin', 'manager_sportif'])
-  if (!hasRole) throw new Error('Forbidden')
+  // Modèle additif : pas de hiérarchie. Lister explicitement chaque rôle autorisé.
+  const ok = await checkRole(session.user.id, ['admin', 'manager'])
+  if (!ok) throw new Error('Forbidden')
+  ```
+  Pour scoper par équipe, vérifier `roles.includes('admin')` AVANT de filtrer par managerId :
+  ```typescript
+  if (roles.includes('admin')) { /* voit tout le club */ }
+  else if (roles.includes('manager')) { /* uniquement ses équipes */ }
   ```
 - Vérification d'ownership pour les ressources :
   ```typescript

@@ -7,7 +7,7 @@ import type { ActionResult } from '@/types'
 type Manager = {
   id: string
   name: string
-  role: string
+  roles: string[]
 }
 
 type Props = {

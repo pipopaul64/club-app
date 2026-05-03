@@ -22,7 +22,7 @@ export async function requireSession() {
 
 /**
  * Combinaison la plus courante dans les Server Actions :
- * session valide + rôle autorisé + clubId résolu depuis la session.
+ * session valide + au moins un rôle autorisé + clubId résolu depuis la session.
  *
  * Le clubId ne transite jamais par le client.
  *
@@ -31,7 +31,7 @@ export async function requireSession() {
 export async function requireAuth(requiredRoles: UserRole[]) {
   const session = await requireSession()
 
-  // Vérification du rôle depuis la DB (source de vérité, filtre soft-delete)
+  // Vérification des rôles depuis la DB (source de vérité, filtre soft-delete)
   const allowed = await checkRole(session.user.id, requiredRoles)
   if (!allowed) throw new Error('Forbidden')
 
@@ -39,13 +39,13 @@ export async function requireAuth(requiredRoles: UserRole[]) {
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
 
-  const role = (session.user as { role?: string }).role as UserRole ?? 'user'
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
 
   return {
     session,
     user: session.user,
     clubId,
-    role,
+    roles,
   }
 }
 

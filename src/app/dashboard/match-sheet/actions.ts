@@ -19,19 +19,19 @@ async function getSessionContext() {
   if (!session) throw new Error('Unauthorized')
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
-  return { userId: session.user.id, clubId, role }
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
+  return { userId: session.user.id, clubId, roles }
 }
 
 async function requireManagerAuth() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) throw new Error('Unauthorized')
-  const ok = await checkRole(session.user.id, ['admin', 'manager_sportif'])
+  const ok = await checkRole(session.user.id, ['admin', 'manager'])
   if (!ok) throw new Error('Forbidden')
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
-  return { userId: session.user.id, clubId, role }
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
+  return { userId: session.user.id, clubId, roles }
 }
 
 // ===========================================================================
@@ -74,7 +74,7 @@ export type SheetData = {
 // listMatchSheetData — données pour la page Manager
 // ---------------------------------------------------------------------------
 export async function listMatchSheetData(eventId: string): Promise<SheetData | null> {
-  const { clubId, userId, role } = await requireManagerAuth()
+  const { clubId, userId, roles } = await requireManagerAuth()
 
   const event = await db.query.events.findFirst({
     where: and(eq(events.id, eventId), eq(events.clubId, clubId)),
@@ -82,8 +82,8 @@ export async function listMatchSheetData(eventId: string): Promise<SheetData | n
   })
   if (!event) return null
 
-  // Manager Sportif : vérifier accès à l'équipe
-  if (role === 'manager_sportif' && event.team?.managerId !== userId) return null
+  // Non-admin : vérifier accès à l'équipe
+  if (!roles.includes('admin') && event.team?.managerId !== userId) return null
 
   // Récupérer convocations + présences + performances en parallèle
   const [convocationList, presenceList, performanceList] = await Promise.all([
@@ -197,14 +197,14 @@ export async function saveMatchSheet(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { clubId, userId, role } = await requireManagerAuth()
+  const { clubId, userId, roles } = await requireManagerAuth()
 
   const event = await db.query.events.findFirst({
     where: and(eq(events.id, eventId), eq(events.clubId, clubId)),
     with: { team: { columns: { id: true, managerId: true } } },
   })
   if (!event) return { success: false, error: 'Événement introuvable' }
-  if (role === 'manager_sportif' && event.team?.managerId !== userId) {
+  if (!roles.includes('admin') && event.team?.managerId !== userId) {
     return { success: false, error: 'Accès refusé' }
   }
 

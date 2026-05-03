@@ -17,9 +17,13 @@ type Props = {
 
 const ROLE_LABELS: Record<string, string> = {
   user: 'Licencié',
-  manager_sportif: 'Manager Sportif',
-  manager_associatif: 'Manager Associatif',
-  admin: 'Administrateur',
+  manager: 'Manager',
+  admin: 'Admin',
+}
+
+function describeRoles(roles: string[]): string {
+  const labels = roles.filter((r) => r !== 'user').map((r) => ROLE_LABELS[r] ?? r)
+  return labels.length > 0 ? labels.join(', ') : ROLE_LABELS.user
 }
 
 export default async function TeamDetailPage({ params }: Props) {
@@ -82,7 +86,7 @@ export default async function TeamDetailPage({ params }: Props) {
           style={{ backgroundColor: '#ffffff', border: '1px solid #e4e0ec' }}
         >
           <h2 className="text-sm font-semibold mb-3" style={{ color: '#353148' }}>
-            Manager Sportif
+            Manager
           </h2>
 
           {team.manager && (
@@ -101,7 +105,7 @@ export default async function TeamDetailPage({ params }: Props) {
                   {team.manager.name}
                 </p>
                 <p className="text-xs" style={{ color: '#8e8a9c' }}>
-                  {ROLE_LABELS[team.manager.role] ?? team.manager.role}
+                  {describeRoles(team.manager.roles)}
                 </p>
               </div>
             </div>
@@ -109,7 +113,7 @@ export default async function TeamDetailPage({ params }: Props) {
 
           {managers.length === 0 ? (
             <p className="text-sm" style={{ color: '#8e8a9c' }}>
-              Aucun Manager Sportif disponible dans ce club.{' '}
+              Aucun Manager disponible dans ce club.{' '}
               <Link
                 href="/dashboard/admin/users"
                 className="underline"

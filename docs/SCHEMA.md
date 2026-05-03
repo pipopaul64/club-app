@@ -14,7 +14,7 @@ clubs
   id, name, slug, createdAt, deletedAt
 
 users
-  id, clubId, email, phone (nullable), role, birthDate, createdAt, deletedAt
+  id, clubId, email, phone (nullable), roles (text[]), birthDate, createdAt, deletedAt
 
 teams
   id, clubId, name, category, season, managerId (userId)
@@ -40,7 +40,7 @@ messages
 
 surveys
   id, clubId, title, createdAt
-  
+
 survey_responses
   id, surveyId, userId, answer (jsonb), createdAt
 
@@ -52,26 +52,29 @@ expenses
 
 sponsors
   id, clubId, name, amount, startDate, endDate, notes, createdAt
-
-event_tasks
-  id, eventId, assigneeId (userId), title, done (bool), createdAt
-
-event_registrations
-  id, eventId, userId, createdAt
 ```
+
+---
+
+## Rôles (`users.roles`)
+- Tableau Postgres `text[]`, default `'{user}'`
+- Valeurs autorisées : `'user' | 'manager' | 'admin'`
+- `'user'` est implicite et toujours présent (pas un choix UI)
+- `'manager'` et `'admin'` sont **additifs** : aucune hiérarchie automatique
+- Un Admin sans `'manager'` n'a PAS accès aux features manager (cf. DECISIONS.md)
 
 ---
 
 ## Règles sur les cotisations
 - Une cotisation est individuelle : elle est liée à un userId
 - Le suivi global (impayés, taux de recouvrement) est calculé côté Admin via agrégation sur clubId
-- Un Manager Sportif ou Associatif n'a pas accès aux cotisations
+- Seul l'Admin a accès aux cotisations
 
 ---
 
 ## Index
 ```
-users         : (clubId, role), (clubId, email)
+users         : (clubId, email) unique
 events        : (clubId, teamId, date)
 convocations  : (eventId, userId)
 presences     : (eventId, userId)
@@ -84,7 +87,7 @@ messages      : (clubId, teamId)
 
 ## Relations & Cascades
 - Supprimer un club → cascade sur toutes ses ressources
-- Supprimer un événement → cascade sur convocations, presences, performances, event_tasks, event_registrations
+- Supprimer un événement → cascade sur convocations, presences, performances
 - Supprimer une équipe → ne pas supprimer les events (conserver l'historique)
 - Supprimer un user → soft delete uniquement (conserver les données historiques)
 

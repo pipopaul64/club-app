@@ -20,34 +20,35 @@ async function getSessionContext() {
   if (!session) throw new Error('Unauthorized')
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
-  return { userId: session.user.id, clubId, role, user: session.user }
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
+  return { userId: session.user.id, clubId, roles, user: session.user }
 }
 
 async function requireManagerAuth() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) throw new Error('Unauthorized')
-  const ok = await checkRole(session.user.id, ['admin', 'manager_sportif'])
+  const ok = await checkRole(session.user.id, ['admin', 'manager'])
   if (!ok) throw new Error('Forbidden')
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
-  return { userId: session.user.id, clubId, role, user: session.user }
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
+  return { userId: session.user.id, clubId, roles, user: session.user }
 }
 
-// Vérifie que le manager a bien accès à l'événement (admin = tout, manager = ses équipes)
+// Vérifie que l'utilisateur a bien accès à l'événement
+// (admin = tout, sinon = vérifier que l'événement est sur une équipe qu'il gère)
 async function assertEventAccess(
   eventId: string,
   clubId: string,
   userId: string,
-  role: UserRole,
+  roles: UserRole[],
 ) {
   const event = await db.query.events.findFirst({
     where: and(eq(events.id, eventId), eq(events.clubId, clubId)),
     with: { team: { columns: { id: true, managerId: true } } },
   })
   if (!event) throw new Error('Événement introuvable')
-  if (role === 'manager_sportif') {
+  if (!roles.includes('admin')) {
     if (!event.teamId || event.team?.managerId !== userId) {
       throw new Error('Vous ne gérez pas cet événement')
     }
@@ -63,11 +64,11 @@ async function assertEventAccess(
 // listEligibleEvents — événements à venir gérés par le manager courant
 // ---------------------------------------------------------------------------
 export async function listEligibleEvents() {
-  const { userId, clubId, role } = await getSessionContext()
+  const { userId, clubId, roles } = await getSessionContext()
 
   const now = new Date()
 
-  if (role === 'admin' || role === 'manager_associatif') {
+  if (roles.includes('admin')) {
     return db.query.events.findMany({
       where: and(eq(events.clubId, clubId), gte(events.date, now)),
       with: { team: { columns: { id: true, name: true } } },
@@ -75,7 +76,7 @@ export async function listEligibleEvents() {
     })
   }
 
-  // manager_sportif : uniquement ses équipes
+  // manager (sans admin) : uniquement ses équipes
   const managedTeams = await db.query.teams.findMany({
     where: and(eq(teams.managerId, userId), eq(teams.clubId, clubId)),
     columns: { id: true },
@@ -185,11 +186,11 @@ export async function listMyConvocations() {
 // Utilisé par la page liste /dashboard/manager/convocations
 // ---------------------------------------------------------------------------
 export async function listManagerEventsSummary() {
-  const { userId, clubId, role } = await requireManagerAuth()
+  const { userId, clubId, roles } = await requireManagerAuth()
 
   let teamIds: string[] = []
 
-  if (role === 'admin') {
+  if (roles.includes('admin')) {
     const allTeams = await db.query.teams.findMany({
       where: eq(teams.clubId, clubId),
       columns: { id: true },
@@ -234,7 +235,7 @@ export async function createConvocation(
   _prevState: ActionResult<{ eventId: string }>,
   formData: FormData,
 ): Promise<ActionResult<{ eventId: string }>> {
-  const { userId, clubId, role } = await requireManagerAuth()
+  const { userId, clubId, roles } = await requireManagerAuth()
 
   const rawUserIds = formData.getAll('userIds') as string[]
   const eventId = formData.get('eventId') as string
@@ -247,13 +248,13 @@ export async function createConvocation(
   // Vérifier accès à l'événement
   let event
   try {
-    event = await assertEventAccess(parsed.data.eventId, clubId, userId, role)
+    event = await assertEventAccess(parsed.data.eventId, clubId, userId, roles)
   } catch (e) {
     return { success: false, error: (e as Error).message }
   }
 
-  // Manager Sportif : l'événement doit avoir une équipe
-  if (role === 'manager_sportif' && !event.teamId) {
+  // Manager (sans admin) : l'événement doit avoir une équipe
+  if (!roles.includes('admin') && !event.teamId) {
     return { success: false, error: 'Cet événement n\'est pas associé à une équipe' }
   }
 
@@ -323,10 +324,10 @@ export async function updateComposition(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { userId, clubId, role } = await requireManagerAuth()
+  const { userId, clubId, roles } = await requireManagerAuth()
 
   try {
-    await assertEventAccess(eventId, clubId, userId, role)
+    await assertEventAccess(eventId, clubId, userId, roles)
   } catch (e) {
     return { success: false, error: (e as Error).message }
   }
@@ -361,7 +362,7 @@ export async function updateComposition(
 export async function removeFromConvocation(
   convocationId: string,
 ): Promise<ActionResult> {
-  const { userId, clubId, role } = await requireManagerAuth()
+  const { userId, clubId, roles } = await requireManagerAuth()
 
   const conv = await db.query.convocations.findFirst({
     where: eq(convocations.id, convocationId),
@@ -371,10 +372,10 @@ export async function removeFromConvocation(
     return { success: false, error: 'Convocation introuvable' }
   }
 
-  // Manager Sportif : vérifier accès à l'événement
-  if (role === 'manager_sportif') {
+  // Manager (sans admin) : vérifier accès à l'événement
+  if (!roles.includes('admin')) {
     try {
-      await assertEventAccess(conv.event.id, clubId, userId, role)
+      await assertEventAccess(conv.event.id, clubId, userId, roles)
     } catch (e) {
       return { success: false, error: (e as Error).message }
     }

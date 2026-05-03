@@ -13,7 +13,7 @@ export type SessionUser = {
   image?: string | null
   emailVerified: boolean
   clubId: string
-  role: UserRole
+  roles: UserRole[]
   createdAt: Date
   updatedAt: Date
 }
@@ -24,7 +24,7 @@ export type SessionUser = {
 export type AuthContext = {
   user: SessionUser
   clubId: string
-  role: UserRole
+  roles: UserRole[]
 }
 
 /**

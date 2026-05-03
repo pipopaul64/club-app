@@ -4,9 +4,9 @@ import { db } from '@/db'
 import { users, teams, teamMembers } from '@/db/schema'
 import { auth } from '@/lib/auth'
 import { checkRole } from '@/lib/check-role'
-import { hasRole } from '@/lib/roles'
+import { hasRole, normalizeRoles } from '@/lib/roles'
 import { createUserSchema, updateUserSchema, createTeamSchema, updateTeamSchema } from '@/lib/validations'
-import { eq, and, isNull, inArray, notInArray, count } from 'drizzle-orm'
+import { eq, and, isNull, inArray, notInArray, count, sql } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import type { ActionResult } from '@/types'
@@ -50,7 +50,7 @@ export async function listUsers(page = 1) {
         name: true,
         email: true,
         phone: true,
-        role: true,
+        roles: true,
         birthDate: true,
         createdAt: true,
       },
@@ -80,7 +80,7 @@ export async function getUser(id: string) {
       name: true,
       email: true,
       phone: true,
-      role: true,
+      roles: true,
       birthDate: true,
     },
   })
@@ -99,7 +99,7 @@ export async function createUser(
     name: formData.get('name'),
     email: formData.get('email'),
     phone: formData.get('phone') || undefined,
-    role: formData.get('role'),
+    roles: formData.getAll('roles'),
     birthDate: formData.get('birthDate') || undefined,
   })
 
@@ -107,7 +107,7 @@ export async function createUser(
     return { success: false, error: parsed.error.errors[0].message }
   }
 
-  const { name, email, phone, role, birthDate } = parsed.data
+  const { name, email, phone, roles, birthDate } = parsed.data
 
   // Unicité email dans le club
   const existing = await db.query.users.findFirst({
@@ -128,7 +128,7 @@ export async function createUser(
     name,
     email,
     phone: phone || null,
-    role,
+    roles: normalizeRoles(roles),
     birthDate: birthDate ? new Date(birthDate) : null,
     emailVerified: false,
   })
@@ -151,7 +151,7 @@ export async function updateUser(
     name: formData.get('name'),
     email: formData.get('email'),
     phone: formData.get('phone') || undefined,
-    role: formData.get('role'),
+    roles: formData.getAll('roles'),
     birthDate: formData.get('birthDate') || undefined,
   })
 
@@ -159,7 +159,7 @@ export async function updateUser(
     return { success: false, error: parsed.error.errors[0].message }
   }
 
-  const { name, email, phone, role, birthDate } = parsed.data
+  const { name, email, phone, roles, birthDate } = parsed.data
 
   // Ownership check : clubId depuis la session, jamais depuis le client
   await db
@@ -168,7 +168,7 @@ export async function updateUser(
       name,
       email,
       phone: phone || null,
-      role,
+      roles: normalizeRoles(roles),
       birthDate: birthDate ? new Date(birthDate) : null,
       updatedAt: new Date(),
     })
@@ -223,10 +223,10 @@ export async function getTeam(id: string) {
   return db.query.teams.findFirst({
     where: and(eq(teams.id, id), eq(teams.clubId, clubId)),
     with: {
-      manager: { columns: { id: true, name: true, role: true } },
+      manager: { columns: { id: true, name: true, roles: true } },
       members: {
         with: {
-          user: { columns: { id: true, name: true, email: true, role: true } },
+          user: { columns: { id: true, name: true, email: true, roles: true } },
         },
       },
     },
@@ -340,11 +340,11 @@ export async function assignManagerToTeam(
         eq(users.clubId, clubId),
         isNull(users.deletedAt),
       ),
-      columns: { id: true, role: true },
+      columns: { id: true, roles: true },
     })
     if (!manager) return { success: false, error: 'Licencié introuvable' }
-    if (!hasRole(manager.role as UserRole, ['manager_sportif', 'admin'])) {
-      return { success: false, error: 'Ce licencié n\'est pas Manager Sportif' }
+    if (!hasRole(manager.roles as UserRole[], ['manager'])) {
+      return { success: false, error: 'Ce licencié n\'a pas le rôle Manager' }
     }
   }
 
@@ -490,7 +490,7 @@ export async function listAvailablePlayers(teamId: string) {
       isNull(users.deletedAt),
       takenIds.length > 0 ? notInArray(users.id, takenIds) : undefined,
     ),
-    columns: { id: true, name: true, role: true },
+    columns: { id: true, name: true, roles: true },
     orderBy: (u, { asc }) => [asc(u.name)],
   })
 }
@@ -510,7 +510,7 @@ export async function listTeamCategories() {
 }
 
 // ---------------------------------------------------------------------------
-// listManagers — licenciés avec rôle manager_sportif ou admin
+// listManagers — licenciés ayant explicitement le rôle 'manager'
 // ---------------------------------------------------------------------------
 export async function listManagers() {
   const { clubId } = await getAdminContext()
@@ -519,9 +519,9 @@ export async function listManagers() {
     where: and(
       eq(users.clubId, clubId),
       isNull(users.deletedAt),
-      inArray(users.role, ['manager_sportif', 'admin']),
+      sql`'manager' = ANY(${users.roles})`,
     ),
-    columns: { id: true, name: true, role: true },
+    columns: { id: true, name: true, roles: true },
     orderBy: (u, { asc }) => [asc(u.name)],
   })
 }

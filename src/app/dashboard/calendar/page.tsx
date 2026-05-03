@@ -108,9 +108,9 @@ const EVENT_COLORS: Record<EventType, { color: string; bg: string; label: string
 // COMPOSANTS PARTAGÉS
 // ===========================================================================
 
-function AddEventLink({ role }: { role: UserRole }) {
-  if (role === 'user' || role === 'manager_associatif') return null
-  const href = role === 'admin'
+function AddEventLink({ roles }: { roles: UserRole[] }) {
+  if (!roles.includes('admin') && !roles.includes('manager')) return null
+  const href = roles.includes('admin')
     ? '/dashboard/admin/events/new'
     : '/dashboard/manager/events/new'
   return (
@@ -449,7 +449,7 @@ export default async function CalendarPage({ searchParams }: Props) {
     redirect('/login')
   }
   if (!session) redirect('/login')
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
 
   // Plage de dates pour la requête
   const dateRange =
@@ -575,7 +575,7 @@ export default async function CalendarPage({ searchParams }: Props) {
             <TypeFilter currentType={type} />
           </Suspense>
           <div className="ml-auto">
-            <AddEventLink role={role} />
+            <AddEventLink roles={roles} />
           </div>
         </div>
       </div>

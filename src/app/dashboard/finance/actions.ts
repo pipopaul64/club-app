@@ -30,17 +30,6 @@ async function requireAdmin() {
   return { userId: session.user.id, clubId }
 }
 
-async function requireFinanceWrite() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) throw new Error('Unauthorized')
-  const ok = await checkRole(session.user.id, ['admin', 'manager_associatif'])
-  if (!ok) throw new Error('Forbidden')
-  const clubId = (session.user as { clubId?: string }).clubId
-  if (!clubId) throw new Error('No club associated with this user')
-  const role = ((session.user as { role?: string }).role ?? 'user')
-  return { userId: session.user.id, clubId, role }
-}
-
 // ===========================================================================
 // RÉSUMÉ FINANCIER (Admin)
 // ===========================================================================
@@ -183,7 +172,7 @@ export async function deleteCotisation(cotisationId: string): Promise<ActionResu
 }
 
 // ===========================================================================
-// DÉPENSES (Admin + Manager Associatif)
+// DÉPENSES (Admin seulement)
 // ===========================================================================
 
 export async function listAllExpenses() {
@@ -196,20 +185,11 @@ export async function listAllExpenses() {
   })
 }
 
-export async function listMyExpenses() {
-  const { userId, clubId } = await requireFinanceWrite()
-
-  return db.query.expenses.findMany({
-    where: and(eq(expenses.clubId, clubId), eq(expenses.authorId, userId)),
-    orderBy: (e, { desc }) => [desc(e.createdAt)],
-  })
-}
-
 export async function createExpense(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { userId, clubId } = await requireFinanceWrite()
+  const { userId, clubId } = await requireAdmin()
 
   const parsed = createExpenseSchema.safeParse({
     amount:      formData.get('amount'),
@@ -231,23 +211,17 @@ export async function createExpense(
 
   revalidatePath('/dashboard/admin/expenses')
   revalidatePath('/dashboard/admin/finance')
-  revalidatePath('/dashboard/manager-associatif/expenses')
   return { success: true, data: undefined }
 }
 
 export async function deleteExpense(expenseId: string): Promise<ActionResult> {
-  const { userId, clubId, role } = await requireFinanceWrite()
+  const { clubId } = await requireAdmin()
 
   const expense = await db.query.expenses.findFirst({
     where: and(eq(expenses.id, expenseId), eq(expenses.clubId, clubId)),
-    columns: { id: true, authorId: true },
+    columns: { id: true },
   })
   if (!expense) return { success: false, error: 'Dépense introuvable' }
-
-  // Seul l'auteur ou un admin peut supprimer
-  if (expense.authorId !== userId && role !== 'admin') {
-    return { success: false, error: 'Accès refusé' }
-  }
 
   await db.delete(expenses).where(
     and(eq(expenses.id, expenseId), eq(expenses.clubId, clubId)),
@@ -255,7 +229,6 @@ export async function deleteExpense(expenseId: string): Promise<ActionResult> {
 
   revalidatePath('/dashboard/admin/expenses')
   revalidatePath('/dashboard/admin/finance')
-  revalidatePath('/dashboard/manager-associatif/expenses')
   return { success: true, data: undefined }
 }
 

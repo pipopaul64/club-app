@@ -20,19 +20,19 @@ async function getSessionContext() {
   if (!session) throw new Error('Unauthorized')
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
-  return { userId: session.user.id, clubId, role }
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
+  return { userId: session.user.id, clubId, roles }
 }
 
 async function requireManagerAuth() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) throw new Error('Unauthorized')
-  const ok = await checkRole(session.user.id, ['admin', 'manager_sportif'])
+  const ok = await checkRole(session.user.id, ['admin', 'manager'])
   if (!ok) throw new Error('Forbidden')
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
-  return { userId: session.user.id, clubId, role }
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
+  return { userId: session.user.id, clubId, roles }
 }
 
 // ===========================================================================
@@ -76,10 +76,10 @@ export async function listMyTeamMessages() {
 // listManagerMessages — messages publiés par le manager connecté
 // ---------------------------------------------------------------------------
 export async function listManagerMessages() {
-  const { userId, clubId, role } = await requireManagerAuth()
+  const { userId, clubId, roles } = await requireManagerAuth()
 
   // Admin : tous les messages du club
-  if (role === 'admin' || role === 'manager_associatif') {
+  if (roles.includes('admin')) {
     return db.query.messages.findMany({
       where: eq(messages.clubId, clubId),
       with: {
@@ -90,7 +90,7 @@ export async function listManagerMessages() {
     })
   }
 
-  // Manager sportif : uniquement ses propres messages
+  // Manager : uniquement ses propres messages
   return db.query.messages.findMany({
     where: and(eq(messages.clubId, clubId), eq(messages.authorId, userId)),
     with: {
@@ -112,7 +112,7 @@ export async function createMessage(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { userId, clubId, role } = await requireManagerAuth()
+  const { userId, clubId, roles } = await requireManagerAuth()
 
   const rawContent = formData.get('content') as string
   const rawTeamId  = formData.get('teamId') as string | null
@@ -126,9 +126,10 @@ export async function createMessage(
   }
 
   let teamId: string | null = parsed.data.teamId ?? null
+  const isAdmin = roles.includes('admin')
 
-  // Manager sportif : doit publier pour une de ses équipes
-  if (role === 'manager_sportif') {
+  // Non-admin : doit publier pour une de ses équipes gérées
+  if (!isAdmin) {
     if (!teamId) {
       return { success: false, error: 'Sélectionnez une équipe' }
     }
@@ -145,8 +146,8 @@ export async function createMessage(
     }
   }
 
-  // Admin / manager_associatif : validation que l'équipe appartient au club
-  if (teamId && (role === 'admin' || role === 'manager_associatif')) {
+  // Admin : si une équipe est précisée, vérifier qu'elle appartient au club
+  if (isAdmin && teamId) {
     const team = await db.query.teams.findFirst({
       where: and(eq(teams.id, teamId), eq(teams.clubId, clubId)),
       columns: { id: true },
@@ -180,7 +181,7 @@ export async function createMessage(
 // deleteMessage — supprime un message (auteur ou admin)
 // ---------------------------------------------------------------------------
 export async function deleteMessage(messageId: string): Promise<ActionResult> {
-  const { userId, clubId, role } = await requireManagerAuth()
+  const { userId, clubId, roles } = await requireManagerAuth()
 
   const message = await db.query.messages.findFirst({
     where: and(eq(messages.id, messageId), eq(messages.clubId, clubId)),
@@ -189,7 +190,7 @@ export async function deleteMessage(messageId: string): Promise<ActionResult> {
   if (!message) return { success: false, error: 'Message introuvable' }
 
   // Seul l'auteur ou un admin peut supprimer
-  if (message.authorId !== userId && role !== 'admin') {
+  if (message.authorId !== userId && !roles.includes('admin')) {
     return { success: false, error: 'Accès refusé' }
   }
 

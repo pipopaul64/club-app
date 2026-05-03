@@ -9,7 +9,6 @@ import { eq, and, isNull, inArray } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import type { ActionResult } from '@/types'
-import type { UserRole } from '@/db/schema'
 
 // ===========================================================================
 // AUTH HELPERS
@@ -20,8 +19,7 @@ async function getSessionContext() {
   if (!session) throw new Error('Unauthorized')
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
-  return { userId: session.user.id, clubId, role }
+  return { userId: session.user.id, clubId }
 }
 
 async function requireAdmin() {

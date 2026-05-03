@@ -6,16 +6,23 @@ import type { UserRole } from '@/db/schema'
 
 const ROLE_LABELS: Record<UserRole, string> = {
   user: 'Licencié',
-  manager_sportif: 'Manager Sportif',
-  manager_associatif: 'Manager Associatif',
-  admin: 'Administrateur',
+  manager: 'Manager',
+  admin: 'Admin',
 }
 
 const ROLE_COLORS: Record<UserRole, string> = {
   user: '#353148',
-  manager_sportif: '#1a7a4a',
-  manager_associatif: '#2563eb',
+  manager: '#1a7a4a',
   admin: '#8c60f3',
+}
+
+/**
+ * Affiche les rôles "actifs" (hors 'user' implicite).
+ * Si l'user n'a que 'user', on affiche le badge Licencié.
+ */
+function activeRoles(roles: string[]): UserRole[] {
+  const filtered = roles.filter((r) => r !== 'user') as UserRole[]
+  return filtered.length > 0 ? filtered : ['user']
 }
 
 interface PageProps {
@@ -105,15 +112,20 @@ export default async function UsersPage({ searchParams }: PageProps) {
                       {user.phone ?? '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className="text-xs font-medium px-2 py-0.5 rounded-full"
-                        style={{
-                          color: ROLE_COLORS[user.role as UserRole],
-                          backgroundColor: `${ROLE_COLORS[user.role as UserRole]}18`,
-                        }}
-                      >
-                        {ROLE_LABELS[user.role as UserRole]}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {activeRoles(user.roles).map((r) => (
+                          <span
+                            key={r}
+                            className="text-xs font-medium px-2 py-0.5 rounded-full"
+                            style={{
+                              color: ROLE_COLORS[r],
+                              backgroundColor: `${ROLE_COLORS[r]}18`,
+                            }}
+                          >
+                            {ROLE_LABELS[r]}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-4">
@@ -153,15 +165,20 @@ export default async function UsersPage({ searchParams }: PageProps) {
                       <p className="text-xs mt-0.5" style={{ color: '#8e8a9c' }}>{user.phone}</p>
                     )}
                   </div>
-                  <span
-                    className="text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0"
-                    style={{
-                      color: ROLE_COLORS[user.role as UserRole],
-                      backgroundColor: `${ROLE_COLORS[user.role as UserRole]}18`,
-                    }}
-                  >
-                    {ROLE_LABELS[user.role as UserRole]}
-                  </span>
+                  <div className="flex flex-wrap gap-1 flex-shrink-0">
+                    {activeRoles(user.roles).map((r) => (
+                      <span
+                        key={r}
+                        className="text-xs font-medium px-2 py-0.5 rounded-full"
+                        style={{
+                          color: ROLE_COLORS[r],
+                          backgroundColor: `${ROLE_COLORS[r]}18`,
+                        }}
+                      >
+                        {ROLE_LABELS[r]}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid #f0edf8' }}>
                   <Link

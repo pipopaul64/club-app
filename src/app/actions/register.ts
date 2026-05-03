@@ -75,9 +75,10 @@ export async function registerClub(
   }
 
   // clubId + rôle admin assignés côté serveur, jamais depuis le client
+  // Le créateur du club est admin (et reste 'user' implicitement)
   await db
     .update(users)
-    .set({ clubId, role: 'admin' })
+    .set({ clubId, roles: ['user', 'admin'] })
     .where(eq(users.id, signUpResult.user.id))
 
   return { success: true, data: { redirect: '/dashboard' } }

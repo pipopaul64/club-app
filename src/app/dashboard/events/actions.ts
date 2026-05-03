@@ -25,8 +25,8 @@ async function getSessionContext() {
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
   const userId = session.user.id
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
-  return { userId, clubId, role }
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
+  return { userId, clubId, roles }
 }
 
 async function requireEventAuth(allowedRoles: UserRole[]) {
@@ -36,8 +36,8 @@ async function requireEventAuth(allowedRoles: UserRole[]) {
   if (!ok) throw new Error('Forbidden')
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) throw new Error('No club associated with this user')
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
-  return { user: session.user, userId: session.user.id, clubId, role }
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
+  return { user: session.user, userId: session.user.id, clubId, roles }
 }
 
 // ===========================================================================
@@ -52,13 +52,13 @@ export type EventFilters = {
 }
 
 // ---------------------------------------------------------------------------
-// listEvents — visibilité selon le rôle :
-//   user        → équipes dont il est membre + événements club (teamId null)
-//   manager     → ses équipes gérées + événements club
-//   admin/assoc → tous les événements du club
+// listEvents — visibilité selon les rôles :
+//   admin           → tous les événements du club
+//   manager         → ses équipes gérées + événements club (teamId null)
+//   sinon (user)    → ses équipes dont il est membre + événements club
 // ---------------------------------------------------------------------------
 export async function listEvents(filters?: EventFilters) {
-  const { userId, clubId, role } = await getSessionContext()
+  const { userId, clubId, roles } = await getSessionContext()
 
   // Plage de dates
   let startDate: Date | undefined
@@ -76,22 +76,24 @@ export async function listEvents(filters?: EventFilters) {
   // Filtre de visibilité
   let visibilityCondition: SQL<unknown> | undefined
 
-  if (role === 'user') {
-    const memberships = await db.query.teamMembers.findMany({
-      where: and(eq(teamMembers.userId, userId), eq(teamMembers.clubId, clubId)),
-      columns: { teamId: true },
-    })
-    const teamIds = memberships.map((m) => m.teamId)
-    visibilityCondition =
-      teamIds.length > 0
-        ? or(isNull(events.teamId), inArray(events.teamId, teamIds))
-        : isNull(events.teamId)
-  } else if (role === 'manager_sportif') {
+  if (roles.includes('admin')) {
+    // Aucun filtre — admin voit tout le club
+  } else if (roles.includes('manager')) {
     const managedTeams = await db.query.teams.findMany({
       where: and(eq(teams.managerId, userId), eq(teams.clubId, clubId)),
       columns: { id: true },
     })
     const teamIds = managedTeams.map((t) => t.id)
+    visibilityCondition =
+      teamIds.length > 0
+        ? or(isNull(events.teamId), inArray(events.teamId, teamIds))
+        : isNull(events.teamId)
+  } else {
+    const memberships = await db.query.teamMembers.findMany({
+      where: and(eq(teamMembers.userId, userId), eq(teamMembers.clubId, clubId)),
+      columns: { teamId: true },
+    })
+    const teamIds = memberships.map((m) => m.teamId)
     visibilityCondition =
       teamIds.length > 0
         ? or(isNull(events.teamId), inArray(events.teamId, teamIds))
@@ -118,17 +120,17 @@ export async function listEvents(filters?: EventFilters) {
 // listAccessibleTeams — pour le filtre calendrier
 // ---------------------------------------------------------------------------
 export async function listAccessibleTeams() {
-  const { userId, clubId, role } = await getSessionContext()
+  const { userId, clubId, roles } = await getSessionContext()
 
-  if (role === 'user') {
-    const memberships = await db.query.teamMembers.findMany({
-      where: and(eq(teamMembers.userId, userId), eq(teamMembers.clubId, clubId)),
-      with: { team: { columns: { id: true, name: true } } },
+  if (roles.includes('admin')) {
+    return db.query.teams.findMany({
+      where: eq(teams.clubId, clubId),
+      columns: { id: true, name: true },
+      orderBy: (t, { asc }) => [asc(t.name)],
     })
-    return memberships.map((m) => m.team).filter(Boolean)
   }
 
-  if (role === 'manager_sportif') {
+  if (roles.includes('manager')) {
     return db.query.teams.findMany({
       where: and(eq(teams.managerId, userId), eq(teams.clubId, clubId)),
       columns: { id: true, name: true },
@@ -136,11 +138,11 @@ export async function listAccessibleTeams() {
     })
   }
 
-  return db.query.teams.findMany({
-    where: eq(teams.clubId, clubId),
-    columns: { id: true, name: true },
-    orderBy: (t, { asc }) => [asc(t.name)],
+  const memberships = await db.query.teamMembers.findMany({
+    where: and(eq(teamMembers.userId, userId), eq(teamMembers.clubId, clubId)),
+    with: { team: { columns: { id: true, name: true } } },
   })
+  return memberships.map((m) => m.team).filter(Boolean)
 }
 
 // ---------------------------------------------------------------------------
@@ -167,14 +169,14 @@ export async function listAdminEvents() {
 // Réservé au Manager Sportif pour la vue liste /dashboard/manager/events
 // ---------------------------------------------------------------------------
 export async function listManagerEvents() {
-  const { user, clubId, role } = await requireEventAuth(['admin', 'manager_sportif'])
+  const { user, clubId, roles } = await requireEventAuth(['admin', 'manager'])
 
   const since = new Date()
   since.setDate(since.getDate() - 60)
 
-  // Admin voit tout ; manager_sportif ne voit que ses équipes
+  // Admin voit tout ; manager (sans admin) ne voit que ses équipes
   let teamCondition = undefined
-  if (role === 'manager_sportif') {
+  if (!roles.includes('admin')) {
     const managedTeams = await db.query.teams.findMany({
       where: and(eq(teams.managerId, user.id), eq(teams.clubId, clubId)),
       columns: { id: true },
@@ -197,13 +199,9 @@ export async function listManagerEvents() {
 // listEventFormTeams — pour le formulaire de création
 // ---------------------------------------------------------------------------
 export async function listEventFormTeams() {
-  const { user, clubId, role } = await requireEventAuth([
-    'admin',
-    'manager_sportif',
-    'manager_associatif',
-  ])
+  const { user, clubId, roles } = await requireEventAuth(['admin', 'manager'])
 
-  if (role === 'manager_sportif') {
+  if (!roles.includes('admin')) {
     return db.query.teams.findMany({
       where: and(eq(teams.managerId, user.id), eq(teams.clubId, clubId)),
       columns: { id: true, name: true },
@@ -332,17 +330,13 @@ async function sendEventNotification(params: {
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// createEvent — Admin + Manager Sportif + Manager Associatif
+// createEvent — Admin + Manager
 // ---------------------------------------------------------------------------
 export async function createEvent(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { user, clubId, role } = await requireEventAuth([
-    'admin',
-    'manager_sportif',
-    'manager_associatif',
-  ])
+  const { user, clubId, roles } = await requireEventAuth(['admin', 'manager'])
 
   const parsed = createEventSchema.safeParse({
     title: formData.get('title'),
@@ -358,8 +352,8 @@ export async function createEvent(
 
   const { title, type, date, location, teamId } = parsed.data
 
-  // Manager Sportif : doit choisir une de ses équipes
-  if (role === 'manager_sportif') {
+  // Manager (sans admin) : doit choisir une de ses équipes
+  if (!roles.includes('admin')) {
     if (!teamId) {
       return { success: false, error: 'Veuillez sélectionner une équipe' }
     }
@@ -423,7 +417,7 @@ export async function updateEvent(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { user, clubId, role } = await requireEventAuth(['admin', 'manager_sportif'])
+  const { user, clubId, roles } = await requireEventAuth(['admin', 'manager'])
 
   const parsed = updateEventSchema.safeParse({
     title: formData.get('title'),
@@ -443,7 +437,7 @@ export async function updateEvent(
   })
   if (!event) return { success: false, error: 'Événement introuvable' }
 
-  if (role === 'manager_sportif') {
+  if (!roles.includes('admin')) {
     if (!event.teamId) {
       return { success: false, error: 'Accès refusé à cet événement' }
     }

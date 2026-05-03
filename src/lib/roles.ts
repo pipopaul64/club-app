@@ -1,20 +1,26 @@
 import type { UserRole } from '@/db/schema'
 
 /**
- * Hiérarchie des rôles — Admin cumule tous les droits (cf. DECISIONS.md)
+ * Modèle de rôles ADDITIF (cf. DECISIONS.md)
+ * - 'user' est implicite : toujours présent dans `users.roles`
+ * - 'manager' et 'admin' sont AJOUTÉS explicitement
+ * - Aucune hiérarchie : un admin n'a PAS automatiquement les droits manager.
+ *   Pour avoir les deux, il faut être explicitement [user, manager, admin].
  */
-const ROLE_HIERARCHY: Record<UserRole, UserRole[]> = {
-  admin: ['admin', 'manager_sportif', 'manager_associatif', 'user'],
-  manager_sportif: ['manager_sportif', 'user'],
-  manager_associatif: ['manager_associatif', 'user'],
-  user: ['user'],
+
+/**
+ * Vrai si l'utilisateur possède au moins un des rôles requis.
+ */
+export function hasRole(userRoles: UserRole[], requiredRoles: UserRole[]): boolean {
+  return requiredRoles.some((r) => userRoles.includes(r))
 }
 
 /**
- * Vérifie si un rôle donné satisfait au moins un des rôles requis.
- * Admin satisfait toujours n'importe quel rôle requis.
+ * Garantit que 'user' est toujours présent et déduplique.
+ * À utiliser dès qu'on construit/modifie un tableau de rôles.
  */
-export function hasRole(userRole: UserRole, requiredRoles: UserRole[]): boolean {
-  const grantedRoles = ROLE_HIERARCHY[userRole] ?? []
-  return requiredRoles.some((r) => grantedRoles.includes(r))
+export function normalizeRoles(roles: UserRole[]): UserRole[] {
+  const set = new Set<UserRole>(roles)
+  set.add('user')
+  return Array.from(set)
 }

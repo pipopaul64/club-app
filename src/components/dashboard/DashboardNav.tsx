@@ -56,7 +56,7 @@ const SECTIONS: NavSection[] = [
   },
   {
     title: 'Mon équipe',
-    roles: ['manager_sportif', 'admin'],
+    roles: ['manager'],
     items: [
       {
         href:  '/dashboard/manager/events',
@@ -73,23 +73,6 @@ const SECTIONS: NavSection[] = [
         href:  '/dashboard/manager/content',
         icon:  '📢',
         label: 'Messages',
-      },
-    ],
-  },
-  {
-    title: 'Associatif',
-    roles: ['manager_associatif', 'admin'],
-    items: [
-      {
-        href:  '/dashboard/manager-associatif/events',
-        icon:  '📅',
-        label: 'Événements',
-        also:  ['/dashboard/manager-associatif/events'],
-      },
-      {
-        href:  '/dashboard/manager-associatif/expenses',
-        icon:  '📤',
-        label: 'Mes dépenses',
       },
     ],
   },
@@ -140,17 +123,9 @@ const SECTIONS: NavSection[] = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-const ROLE_HIERARCHY: Record<UserRole, UserRole[]> = {
-  user:               ['user'],
-  manager_sportif:    ['user', 'manager_sportif'],
-  manager_associatif: ['user', 'manager_associatif'],
-  admin:              ['user', 'manager_sportif', 'manager_associatif', 'admin'],
-}
-
-function canSeeSection(section: NavSection, role: UserRole): boolean {
+function canSeeSection(section: NavSection, roles: UserRole[]): boolean {
   if (!section.roles) return true
-  const effective = ROLE_HIERARCHY[role] ?? ['user']
-  return section.roles.some((r) => effective.includes(r))
+  return section.roles.some((r) => roles.includes(r))
 }
 
 // ---------------------------------------------------------------------------
@@ -158,14 +133,16 @@ function canSeeSection(section: NavSection, role: UserRole): boolean {
 // ---------------------------------------------------------------------------
 
 interface Props {
-  role: UserRole
+  roles: UserRole[]
   userName: string
   /** Called when any nav link is clicked — used by DashboardShell to close the mobile drawer */
   onNavigate?: () => void
 }
 
-export function DashboardNav({ role, userName, onNavigate }: Props) {
+export function DashboardNav({ roles, userName, onNavigate }: Props) {
   const pathname = usePathname()
+  const primaryRole: UserRole =
+    roles.includes('admin') ? 'admin' : roles.includes('manager') ? 'manager' : 'user'
 
   function isActive(item: NavItem): boolean {
     if (pathname === item.href) return true
@@ -191,13 +168,13 @@ export function DashboardNav({ role, userName, onNavigate }: Props) {
           className="text-xs px-2 py-0.5 rounded-full font-medium"
           style={{ color: '#8c60f3', backgroundColor: '#f3f0ff' }}
         >
-          {ROLE_LABELS[role] ?? role}
+          {ROLE_LABELS[primaryRole] ?? primaryRole}
         </span>
       </Link>
 
       {/* Sections */}
       <div className="flex-1 overflow-y-auto py-3 space-y-1">
-        {SECTIONS.filter((s) => canSeeSection(s, role)).map((section) => (
+        {SECTIONS.filter((s) => canSeeSection(s, roles)).map((section) => (
           <div key={section.title} className="px-2">
             <p
               className="px-3 py-1 text-xs font-semibold uppercase tracking-wide"
@@ -263,7 +240,7 @@ export function DashboardNav({ role, userName, onNavigate }: Props) {
               {userName}
             </p>
             <p className="text-xs truncate" style={{ color: '#8e8a9c' }}>
-              {ROLE_LABELS[role] ?? role}
+              {ROLE_LABELS[primaryRole] ?? primaryRole}
             </p>
           </div>
         </div>
@@ -283,8 +260,7 @@ export function DashboardNav({ role, userName, onNavigate }: Props) {
 }
 
 const ROLE_LABELS: Record<UserRole, string> = {
-  user:               'Licencié',
-  manager_sportif:    'Manager sportif',
-  manager_associatif: 'Manager associatif',
-  admin:              'Admin',
+  user:    'Licencié',
+  manager: 'Manager',
+  admin:   'Admin',
 }

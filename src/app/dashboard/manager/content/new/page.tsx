@@ -13,16 +13,16 @@ export default async function NewContentPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) redirect('/login')
 
-  const ok = await checkRole(session.user.id, ['admin', 'manager_sportif'])
+  const ok = await checkRole(session.user.id, ['admin', 'manager'])
   if (!ok) redirect('/dashboard')
 
   const clubId = (session.user as { clubId?: string }).clubId
   if (!clubId) redirect('/dashboard')
 
-  const role = ((session.user as { role?: string }).role ?? 'user') as UserRole
+  const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
   const userId = session.user.id
 
-  const isAdmin = role === 'admin' || role === 'manager_associatif'
+  const isAdmin = roles.includes('admin')
 
   // Récupérer les équipes disponibles
   let availableTeams: { id: string; name: string }[] = []

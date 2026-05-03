@@ -35,10 +35,15 @@ export const clubsRelations = relations(clubs, ({ many }) => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Rôles
+// ---------------------------------------------------------------------------
+// 'user' est implicite et toujours présent dans `users.roles`.
+// 'manager' et 'admin' sont additifs : un admin n'hérite PAS des droits manager.
+export type UserRole = 'user' | 'manager' | 'admin'
+
+// ---------------------------------------------------------------------------
 // users
 // ---------------------------------------------------------------------------
-export type UserRole = 'user' | 'manager_sportif' | 'manager_associatif' | 'admin'
-
 export const users = pgTable(
   'users',
   {
@@ -51,14 +56,18 @@ export const users = pgTable(
     phone: text('phone'),
     name: text('name').notNull(),
     image: text('image'),
-    role: text('role').$type<UserRole>().notNull().default('user'),
+    // Tableau additif : 'user' est toujours présent ; 'manager'/'admin' explicites.
+    roles: text('roles')
+      .array()
+      .$type<UserRole[]>()
+      .notNull()
+      .default(['user']),
     birthDate: timestamp('birth_date'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
     deletedAt: timestamp('deleted_at'),
   },
   (t) => [
-    index('users_club_role_idx').on(t.clubId, t.role),
     uniqueIndex('users_club_email_idx').on(t.clubId, t.email),
   ],
 )
@@ -72,8 +81,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   performances: many(performances),
   cotisations: many(cotisations),
   surveyResponses: many(surveyResponses),
-  eventRegistrations: many(eventRegistrations),
-  assignedTasks: many(eventTasks),
   messages: many(messages),
   expenses: many(expenses),
 }))
@@ -202,8 +209,6 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   convocations: many(convocations),
   presences: many(presences),
   performances: many(performances),
-  tasks: many(eventTasks),
-  registrations: many(eventRegistrations),
 }))
 
 // ---------------------------------------------------------------------------
@@ -437,40 +442,3 @@ export const sponsorsRelations = relations(sponsors, ({ one }) => ({
   club: one(clubs, { fields: [sponsors.clubId], references: [clubs.id] }),
 }))
 
-// ---------------------------------------------------------------------------
-// event_tasks
-// ---------------------------------------------------------------------------
-export const eventTasks = pgTable('event_tasks', {
-  id: text('id').primaryKey(),
-  eventId: text('event_id')
-    .notNull()
-    .references(() => events.id, { onDelete: 'cascade' }),
-  assigneeId: text('assignee_id').references(() => users.id, { onDelete: 'set null' }),
-  title: text('title').notNull(),
-  done: boolean('done').notNull().default(false),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-})
-
-export const eventTasksRelations = relations(eventTasks, ({ one }) => ({
-  event: one(events, { fields: [eventTasks.eventId], references: [events.id] }),
-  assignee: one(users, { fields: [eventTasks.assigneeId], references: [users.id] }),
-}))
-
-// ---------------------------------------------------------------------------
-// event_registrations
-// ---------------------------------------------------------------------------
-export const eventRegistrations = pgTable('event_registrations', {
-  id: text('id').primaryKey(),
-  eventId: text('event_id')
-    .notNull()
-    .references(() => events.id, { onDelete: 'cascade' }),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-})
-
-export const eventRegistrationsRelations = relations(eventRegistrations, ({ one }) => ({
-  event: one(events, { fields: [eventRegistrations.eventId], references: [events.id] }),
-  user: one(users, { fields: [eventRegistrations.userId], references: [users.id] }),
-}))

@@ -1,13 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
   createUserSchema,
-  updateUserSchema,
   createTeamSchema,
   createEventSchema,
   createCotisationSchema,
   createExpenseSchema,
   createSponsorSchema,
-  createEventTaskSchema,
   createSurveySchema,
   createMessageSchema,
 } from './validations'
@@ -20,10 +18,10 @@ describe('createUserSchema', () => {
     name: 'Jean Dupont',
     email: 'jean@example.com',
     phone: '+33 6 12 34 56 78',
-    role: 'user' as const,
+    roles: [] as ('manager' | 'admin')[],
   }
 
-  it('accepts a valid user', () => {
+  it('accepts a valid user with no extra roles', () => {
     expect(createUserSchema.safeParse(valid).success).toBe(true)
   })
 
@@ -48,15 +46,19 @@ describe('createUserSchema', () => {
   })
 
   it('rejects unknown role', () => {
-    const result = createUserSchema.safeParse({ ...valid, role: 'superadmin' })
+    const result = createUserSchema.safeParse({ ...valid, roles: ['superadmin'] })
     expect(result.success).toBe(false)
   })
 
-  it('accepts all valid roles', () => {
-    const roles = ['user', 'manager_sportif', 'manager_associatif', 'admin'] as const
-    for (const role of roles) {
-      expect(createUserSchema.safeParse({ ...valid, role }).success).toBe(true)
-    }
+  it('rejects implicit user role being assigned explicitly', () => {
+    const result = createUserSchema.safeParse({ ...valid, roles: ['user'] })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts manager and admin roles individually and combined', () => {
+    expect(createUserSchema.safeParse({ ...valid, roles: ['manager'] }).success).toBe(true)
+    expect(createUserSchema.safeParse({ ...valid, roles: ['admin'] }).success).toBe(true)
+    expect(createUserSchema.safeParse({ ...valid, roles: ['manager', 'admin'] }).success).toBe(true)
   })
 })
 
@@ -218,27 +220,6 @@ describe('createSponsorSchema', () => {
 
   it('rejects amount > 9999999', () => {
     expect(createSponsorSchema.safeParse({ ...valid, amount: 10_000_000 }).success).toBe(false)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// createEventTaskSchema
-// ---------------------------------------------------------------------------
-describe('createEventTaskSchema', () => {
-  it('accepts a valid task title', () => {
-    expect(createEventTaskSchema.safeParse({ title: 'Accueil des invités' }).success).toBe(true)
-  })
-
-  it('rejects empty title', () => {
-    expect(createEventTaskSchema.safeParse({ title: '' }).success).toBe(false)
-  })
-
-  it('rejects title longer than 200 chars', () => {
-    expect(createEventTaskSchema.safeParse({ title: 'x'.repeat(201) }).success).toBe(false)
-  })
-
-  it('accepts optional assigneeId', () => {
-    expect(createEventTaskSchema.safeParse({ title: 'Tâche', assigneeId: 'user-uuid' }).success).toBe(true)
   })
 })
 

@@ -3,12 +3,14 @@ import { z } from 'zod'
 // ---------------------------------------------------------------------------
 // Rôles
 // ---------------------------------------------------------------------------
-export const userRoleSchema = z.enum([
-  'user',
-  'manager_sportif',
-  'manager_associatif',
-  'admin',
-])
+export const userRoleSchema = z.enum(['user', 'manager', 'admin'])
+
+/**
+ * Rôles assignables explicitement via l'UI.
+ * 'user' est implicite et toujours présent — pas un choix.
+ */
+export const assignableRoleSchema = z.enum(['manager', 'admin'])
+export const userRolesSchema = z.array(assignableRoleSchema)
 
 // ---------------------------------------------------------------------------
 // Licenciés
@@ -21,7 +23,7 @@ export const createUserSchema = z.object({
   name: z.string().min(2, 'Nom trop court'),
   email: z.string().email('Email invalide'),
   phone: phoneSchema.optional().or(z.literal('')),
-  role: userRoleSchema,
+  roles: userRolesSchema,
   birthDate: z.string().optional(),
 })
 
@@ -29,7 +31,7 @@ export const updateUserSchema = z.object({
   name: z.string().min(2, 'Nom trop court'),
   email: z.string().email('Email invalide'),
   phone: phoneSchema.optional().or(z.literal('')),
-  role: userRoleSchema,
+  roles: userRolesSchema,
   birthDate: z.string().optional(),
 })
 
@@ -173,12 +175,3 @@ export const updateSponsorSchema = createSponsorSchema
 export type CreateSponsorInput = z.infer<typeof createSponsorSchema>
 export type UpdateSponsorInput = z.infer<typeof updateSponsorSchema>
 
-// ---------------------------------------------------------------------------
-// Événements associatifs — Tâches
-// ---------------------------------------------------------------------------
-export const createEventTaskSchema = z.object({
-  title:      z.string().min(1, 'La tâche ne peut pas être vide').max(200, 'Titre trop long'),
-  assigneeId: z.string().optional(),
-})
-
-export type CreateEventTaskInput = z.infer<typeof createEventTaskSchema>

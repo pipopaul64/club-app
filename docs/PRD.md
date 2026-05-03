@@ -24,35 +24,35 @@ Aider les clubs sportifs amateurs à se structurer et se professionnaliser en si
 ## Rôles & Permissions
 
 ### Définition des rôles
-- **User** : licencié du club (joueur, parent)
-- **Manager Sportif** : encadrant / coach — gère son équipe sportivement
-- **Manager Associatif** : bureau / bénévole — gère la vie associative
-- **Admin** : bureau restreint / employé — accès complet
+- **User** : licencié du club (joueur, parent) — rôle implicite, toujours présent
+- **Manager** : encadrant / coach — gère ses équipes (convocations, feuille de match, messages)
+- **Admin** : bureau / employé — accès complet à la gestion club et finances
 
-### Règles de cumul
+### Règles de cumul (additif strict)
 - Un utilisateur appartient à UN seul club
-- Un Manager Sportif ne voit que les équipes qui lui sont assignées
-- Le rôle Admin cumule automatiquement les droits Manager Sportif et Manager Associatif
+- Tout licencié est `user` par défaut (et le reste à vie)
+- Les rôles `manager` et `admin` sont **additifs et explicites**
+- Un Admin n'a PAS automatiquement les droits Manager : il doit recevoir les deux rôles
+- Un Manager ne voit que les équipes qui lui sont assignées
 
 ### Matrice des permissions
 
-| Action | User | Manager Sportif | Manager Associatif | Admin |
-|---|:---:|:---:|:---:|:---:|
-| Voir le calendrier | ✅ | ✅ | ✅ | ✅ |
-| Créer un événement | ❌ | ✅ | ✅ | ✅ |
-| Créer une convocation | ❌ | ✅ | ❌ | ✅ |
-| Marquer les présences | ❌ | ✅ | ❌ | ✅ |
-| Saisir les performances | ❌ | ✅ | ❌ | ✅ |
-| Publier un message descendant | ❌ | ✅ (équipe) | ❌ | ✅ (club) |
-| Poster sur la vitrine | ❌ | ❌ | ❌ | ✅ |
-| Gérer les cotisations | ❌ | ❌ | ❌ | ✅ |
-| Gérer les licences | ❌ | ❌ | ❌ | ✅ |
-| Tableau de bord financier | ❌ | ❌ | ❌ | ✅ |
-| Ajouter une dépense | ❌ | ❌ | ✅ | ✅ |
-| Gérer les sponsors | ❌ | ❌ | ❌ | ✅ |
-| Créer un événement associatif | ❌ | ❌ | ✅ | ✅ |
-| Gérer les licenciés | ❌ | ❌ | ❌ | ✅ |
-| Gérer les équipes | ❌ | ❌ | ❌ | ✅ |
+| Action | User | Manager | Admin |
+|---|:---:|:---:|:---:|
+| Voir le calendrier | ✅ | ✅ | ✅ |
+| Créer un événement | ❌ | ✅ (ses équipes) | ✅ |
+| Créer une convocation | ❌ | ✅ | ❌ (sauf cumul) |
+| Marquer les présences | ❌ | ✅ | ❌ (sauf cumul) |
+| Saisir les performances | ❌ | ✅ | ❌ (sauf cumul) |
+| Publier un message descendant | ❌ | ✅ (équipe) | ✅ (club) |
+| Poster sur la vitrine | ❌ | ❌ | ✅ |
+| Gérer les cotisations | ❌ | ❌ | ✅ |
+| Gérer les licences | ❌ | ❌ | ✅ |
+| Tableau de bord financier | ❌ | ❌ | ✅ |
+| Gérer les dépenses | ❌ | ❌ | ✅ |
+| Gérer les sponsors | ❌ | ❌ | ✅ |
+| Gérer les licenciés | ❌ | ❌ | ✅ |
+| Gérer les équipes | ❌ | ❌ | ✅ |
 
 ---
 
@@ -65,12 +65,12 @@ Aider les clubs sportifs amateurs à se structurer et se professionnaliser en si
 - Sondages et questionnaires (inscriptions événements)
 
 ### Users — Mon équipe
-- Messagerie descendante (manager sportif)
+- Messagerie descendante (manager)
 - Convocations / Compositions (lecture)
 - Feuille de match (lecture)
 - Consultation de contenu partagé par le manager
 
-### Manager Sportif — Mon équipe
+### Manager — Mon équipe
 - Messagerie (App → message formaté → bouton "Partager sur WhatsApp")
 - Création de convocation + composition
 - Remplissage de la feuille de match
@@ -78,14 +78,9 @@ Aider les clubs sportifs amateurs à se structurer et se professionnaliser en si
 - Saisie des performances après match
 - Publication de contenu (PDF, lien, note)
 
-### Manager Associatif — Gestion associative
-- Ajout d'une dépense avec justificatif photo
-- Création d'événement avec todo list + gestion des inscrits
-- Assignation de tâches à des bénévoles
-
 ### Admin — Gestion Associative
 - Tableau de bord financier global
-- Gestion des dépenses
+- Gestion des dépenses (création, catégorisation, suppression)
 - Gestion financière des sponsors
 - Gestion des cotisations / inscriptions / licences
 - CRUD Licenciés
@@ -101,22 +96,22 @@ Aider les clubs sportifs amateurs à se structurer et se professionnaliser en si
 ## Flux critiques
 
 ### Flux : Convocation
-1. Manager Sportif sélectionne un événement
+1. Manager sélectionne un événement
 2. Sélectionne les joueurs → crée les entrées convocations
 3. Génère le message formaté
 4. Bouton WhatsApp → deep link avec message pré-rempli
 5. Notification push envoyée à chaque joueur convoqué
 
 ### Flux : Suivi des présences
-1. Manager Sportif ouvre un entraînement
+1. Manager ouvre un entraînement
 2. Marque chaque joueur présent / absent
 3. Données enregistrées et visibles dans le suivi individuel
 
-### Flux : Dépense (Manager Associatif)
-1. Manager Associatif ajoute une dépense
+### Flux : Dépense (Admin)
+1. Admin ajoute une dépense
 2. Photo du justificatif uploadée
 3. Catégorie sélectionnée
-4. Dépense visible dans le tableau de bord Admin
+4. Dépense visible dans le tableau de bord financier
 
 ### Flux : Cotisation
 1. Admin crée une cotisation pour un licencié

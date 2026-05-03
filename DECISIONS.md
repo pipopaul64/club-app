@@ -61,14 +61,37 @@ Ne pas modifier ces choix sans mettre à jour ce fichier.
 
 ---
 
-## Rôles : cumul Admin = Manager Sportif + Manager Associatif
-**Décision** : le rôle Admin inclut automatiquement tous les droits Manager Sportif et Manager Associatif.
-**Raison** : dans les petits clubs, le président ou l'employé fait tout. Évite de cumuler manuellement les rôles.
-**Impact** : la vérification de rôle doit inclure 'admin' dans tous les checks manager :
+## Rôles : modèle additif strict (pas de cumul automatique)
+**Décision** : `users.roles` est un tableau `text[]` de rôles **explicitement** assignés, sans hiérarchie automatique.
+- Valeurs : `'user' | 'manager' | 'admin'`
+- `'user'` est implicite (toujours présent, jamais retiré)
+- `'manager'` et `'admin'` sont **additifs** : un Admin n'hérite PAS des droits Manager
+- Pour avoir les deux capacités, l'utilisateur doit recevoir `['user', 'manager', 'admin']`
+
+**Raison** : les responsabilités d'un manager d'équipe (convocations, feuille de match, scope par équipe) sont fonctionnellement très différentes de celles d'un admin (finances, licenciés, vitrine). Le cumul implicite obligeait à pousser un admin par défaut dans des écrans qui ne le concernaient pas, et masquait la distinction réelle. L'ajout explicite est plus simple à raisonner et oblige à choisir.
+
+**Implication code** :
 ```typescript
-checkRole(session.user.id, ['admin', 'manager_sportif'])
-checkRole(session.user.id, ['admin', 'manager_associatif'])
+// checkRole accepte plusieurs rôles ; renvoie true si l'user en possède AU MOINS UN
+const ok = await checkRole(session.user.id, ['admin', 'manager'])
+
+// Pour les checks de scope par équipe, vérifier admin EN PREMIER pour bypass scoping :
+if (roles.includes('admin')) { /* voit tout */ }
+else if (roles.includes('manager')) { /* uniquement ses équipes gérées */ }
 ```
+
+**Évolution depuis le MVP initial** : précédemment Admin auto-cumulait Manager Sportif + Manager Associatif. Le rôle "Manager Associatif" a été supprimé entièrement (cf. ci-dessous), et le cumul implicite a été retiré pour clarifier les responsabilités.
+
+---
+
+## Suppression du rôle Manager Associatif
+**Décision** : le rôle `manager_associatif` (renommé `asso` lors d'une étape intermédiaire, puis supprimé) n'existe plus. Les capacités associatives (dépenses, événements avec todo lists, inscriptions) sont :
+- **Dépenses** : remontées au rôle Admin (seul à gérer les finances)
+- **Événements associatifs / todo lists / inscriptions** : retirés du MVP (`event_tasks` et `event_registrations` supprimés du schéma)
+
+**Raison** : trop de friction architecturale et UI (un rôle entier + 2 tables + plusieurs pages) pour une seule feature qui restait peu utilisée (saisie de dépenses). Les bénévoles peuvent continuer à transmettre leurs justificatifs hors-app au bureau, qui les saisit comme Admin.
+
+**À réévaluer** : si plusieurs clubs pilotes expriment le besoin d'un workflow dépenses bénévole, ré-introduire un rôle minimal ou un partage temporaire d'accès limité.
 
 ---
 

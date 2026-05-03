@@ -7,18 +7,20 @@ import { useEffect } from 'react'
 import type { ActionResult } from '@/types'
 import type { UserRole } from '@/db/schema'
 
-const ROLE_LABELS: Record<UserRole, string> = {
-  user: 'Licencié',
-  manager_sportif: 'Manager Sportif',
-  manager_associatif: 'Manager Associatif',
-  admin: 'Administrateur',
-}
+/**
+ * 'user' n'est PAS proposé : il est implicite et toujours présent.
+ * Les rôles ici sont additifs et explicites.
+ */
+const ASSIGNABLE_ROLES: { value: UserRole; label: string; desc: string }[] = [
+  { value: 'manager', label: 'Manager', desc: 'Gère ses équipes (convocations, feuille de match, messages)' },
+  { value: 'admin',   label: 'Admin',   desc: 'Accès complet : licenciés, équipes, finances, vitrine' },
+]
 
 type UserFormValues = {
   name?: string
   email?: string
   phone?: string
-  role?: UserRole
+  roles?: UserRole[]
   birthDate?: string | null
 }
 
@@ -107,26 +109,38 @@ export function UserForm({ action, defaultValues, submitLabel, cancelHref }: Use
         />
       </div>
 
-      {/* Rôle */}
-      <div>
-        <label htmlFor="role" className="block text-sm font-medium mb-1" style={labelStyle}>
-          Rôle
-        </label>
-        <select
-          id="role"
-          name="role"
-          required
-          defaultValue={defaultValues?.role ?? 'user'}
-          className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
-          style={inputStyle}
-          onFocus={e => (e.target.style.borderColor = '#8c60f3')}
-          onBlur={e => (e.target.style.borderColor = '#e4e0ec')}
-        >
-          {(Object.entries(ROLE_LABELS) as [UserRole, string][]).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
+      {/* Rôles (multi-sélection) */}
+      <fieldset>
+        <legend className="block text-sm font-medium mb-1" style={labelStyle}>
+          Rôles supplémentaires
+        </legend>
+        <p className="text-xs mb-2" style={{ color: '#8e8a9c' }}>
+          Tout licencié a accès à son espace personnel. Cochez les rôles à ajouter — additifs (un Admin
+          n&apos;est pas automatiquement Manager).
+        </p>
+        <div className="space-y-2">
+          {ASSIGNABLE_ROLES.map(({ value, label, desc }) => (
+            <label
+              key={value}
+              className="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors"
+              style={{ border: '1px solid #e4e0ec', backgroundColor: '#ffffff' }}
+            >
+              <input
+                type="checkbox"
+                name="roles"
+                value={value}
+                defaultChecked={defaultValues?.roles?.includes(value) ?? false}
+                className="mt-0.5"
+                style={{ accentColor: '#8c60f3' }}
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-medium" style={{ color: '#353148' }}>{label}</p>
+                <p className="text-xs" style={{ color: '#8e8a9c' }}>{desc}</p>
+              </div>
+            </label>
           ))}
-        </select>
-      </div>
+        </div>
+      </fieldset>
 
       {/* Date de naissance */}
       <div>

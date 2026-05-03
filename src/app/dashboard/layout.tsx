@@ -21,7 +21,7 @@ export default async function DashboardLayout({
   const user = session.user as unknown as SessionUser
 
   return (
-    <DashboardShell role={user.role} userName={user.name}>
+    <DashboardShell roles={user.roles} userName={user.name}>
       {children}
     </DashboardShell>
   )

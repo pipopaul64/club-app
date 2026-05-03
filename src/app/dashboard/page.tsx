@@ -24,7 +24,7 @@ export default async function DashboardPage() {
 
       {/* Body */}
       <div className="p-8 max-w-2xl space-y-6">
-        <QuickLinks role={user.role} />
+        <QuickLinks roles={user.roles} />
       </div>
     </div>
   )
@@ -34,7 +34,7 @@ export default async function DashboardPage() {
 // Accès rapides contextuels
 // ---------------------------------------------------------------------------
 
-function QuickLinks({ role }: { role: string }) {
+function QuickLinks({ roles }: { roles: string[] }) {
   const links: { href: string; icon: string; title: string; desc: string }[] = [
     { href: '/dashboard/calendar',    icon: '📅', title: 'Calendrier',   desc: 'Voir les événements du club' },
     { href: '/dashboard/convocations', icon: '📨', title: 'Convocations', desc: 'Mes convocations et présences' },
@@ -42,20 +42,14 @@ function QuickLinks({ role }: { role: string }) {
     { href: '/dashboard/surveys',     icon: '🗳️', title: 'Sondages',     desc: 'Répondre aux sondages en cours' },
   ]
 
-  if (role === 'manager_sportif' || role === 'admin') {
+  if (roles.includes('manager')) {
     links.push(
       { href: '/dashboard/manager/convocations',       icon: '📣', title: 'Gérer convocations', desc: "Convoquer et composer l'équipe" },
       { href: '/dashboard/manager/content',            icon: '📢', title: 'Envoyer un message', desc: 'Communiquer avec l\'équipe' },
     )
   }
 
-  if (role === 'manager_associatif' || role === 'admin') {
-    links.push(
-      { href: '/dashboard/manager-associatif/expenses', icon: '📤', title: 'Mes dépenses',      desc: 'Soumettre et suivre les dépenses' },
-    )
-  }
-
-  if (role === 'admin') {
+  if (roles.includes('admin')) {
     links.push(
       { href: '/dashboard/admin/users',   icon: '👥', title: 'Licenciés', desc: 'Gérer les membres du club' },
       { href: '/dashboard/admin/finance', icon: '💰', title: 'Finances',  desc: 'Cotisations, dépenses, sponsors' },

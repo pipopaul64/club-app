@@ -5,12 +5,12 @@ import { DashboardNav } from './DashboardNav'
 import type { UserRole } from '@/db/schema'
 
 interface Props {
-  role: UserRole
+  roles: UserRole[]
   userName: string
   children: React.ReactNode
 }
 
-export function DashboardShell({ role, userName, children }: Props) {
+export function DashboardShell({ roles, userName, children }: Props) {
   const [open, setOpen] = useState(false)
   const close = useCallback(() => setOpen(false), [])
 
@@ -46,7 +46,7 @@ export function DashboardShell({ role, userName, children }: Props) {
           'md:relative md:translate-x-0',
         ].join(' ')}
       >
-        <DashboardNav role={role} userName={userName} onNavigate={close} />
+        <DashboardNav roles={roles} userName={userName} onNavigate={close} />
       </aside>
 
       {/* ------------------------------------------------------------------ */}

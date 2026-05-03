@@ -41,7 +41,7 @@ export default async function EditUserPage({ params }: Props) {
             name: user.name,
             email: user.email,
             phone: user.phone ?? undefined,
-            role: user.role as UserRole,
+            roles: user.roles as UserRole[],
             birthDate: user.birthDate ? user.birthDate.toISOString() : null,
           }}
           submitLabel="Enregistrer les modifications"

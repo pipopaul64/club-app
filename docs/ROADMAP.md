@@ -13,7 +13,7 @@ Pour chaque tâche, utilise ce format :
 
 Exemple :
 > "En suivant CLAUDE.md, PRD.md et SCHEMA.md, implémente la Server Action createConvocation.
-> Contraintes : rôle manager_sportif requis, vérifier que l'équipe appartient au club de la session, validation Zod sur les champs eventId et userIds."
+> Contraintes : rôle manager requis, vérifier que l'équipe appartient au club de la session, validation Zod sur les champs eventId et userIds."
 
 ## Dépendances entre sprints
 ```
@@ -23,7 +23,6 @@ Sprint 3 → requiert Sprint 2 (events existent)
 Sprint 4 → requiert Sprint 3 (convocations existent)
 Sprint 5 → requiert Sprint 1 (users existent)
 Sprint 6 → requiert Sprint 1 (users existent)
-Sprint 7 → requiert Sprint 2 (events existent)
 ```
 
 ---
@@ -52,15 +51,15 @@ Sprint 7 → requiert Sprint 2 (events existent)
 > Objectif : un Admin peut gérer son club et ses licenciés
 
 - [ ] CRUD Licenciés (Admin) — ajout, modification, désactivation (soft delete)
-- [ ] Gestion des rôles (User / Manager Sportif / Manager Associatif / Admin)
+- [ ] Gestion des rôles additifs (User implicite + Manager / Admin explicites)
 - [ ] CRUD Équipes (Admin) — création, édition, assignation des joueurs
-- [ ] Assignation d'un Manager Sportif à une équipe
-- [ ] Page profil utilisateur (nom, email, équipe, rôle)
+- [ ] Assignation d'un Manager à une équipe
+- [ ] Page profil utilisateur (nom, email, équipe, rôles)
 
 ### Definition of Done
-- [ ] Un Admin peut créer un licencié et lui assigner un rôle
+- [ ] Un Admin peut créer un licencié et lui assigner un ou plusieurs rôles
 - [ ] Un Admin peut créer une équipe et y assigner des joueurs
-- [ ] Un Manager Sportif ne voit que ses équipes assignées
+- [ ] Un Manager ne voit que ses équipes assignées
 - [ ] Un licencié désactivé ne peut plus se connecter
 
 ---
@@ -69,14 +68,14 @@ Sprint 7 → requiert Sprint 2 (events existent)
 > Objectif : tous les acteurs voient les événements du club
 
 - [ ] Schema DB : events (match / entraînement / autre)
-- [ ] CRUD Événements (Admin + Manager Sportif)
+- [ ] CRUD Événements (Admin + Manager)
 - [ ] Vue calendrier mensuelle avec dropdown équipe (Users)
 - [ ] Vue hebdomadaire et journalière (Users)
 - [ ] Filtrage des événements par équipe et par type
 - [ ] Notifications lors de la création d'un événement
 
 ### Definition of Done
-- [ ] Un Manager Sportif peut créer un événement pour son équipe
+- [ ] Un Manager peut créer un événement pour son équipe
 - [ ] Un User voit uniquement les événements de son équipe
 - [ ] Un Admin voit tous les événements du club
 - [ ] Le calendrier s'affiche correctement en vue mensuelle et hebdomadaire
@@ -84,10 +83,10 @@ Sprint 7 → requiert Sprint 2 (events existent)
 ---
 
 ## Sprint 3 — Convocations & Compositions
-> Objectif : Manager Sportif peut convoquer et composer son équipe
+> Objectif : Manager peut convoquer et composer son équipe
 
 - [ ] Schema DB : convocations (pending / confirmed / declined)
-- [ ] Création d'une convocation liée à un événement (Manager Sportif)
+- [ ] Création d'une convocation liée à un événement (Manager)
 - [ ] Sélection des joueurs convoqués
 - [ ] Définition de la composition (titulaires / remplaçants)
 - [ ] Génération du message formaté pour WhatsApp
@@ -96,7 +95,7 @@ Sprint 7 → requiert Sprint 2 (events existent)
 - [ ] Notification push à la réception d'une convocation
 
 ### Definition of Done
-- [ ] Un Manager Sportif peut créer une convocation et sélectionner ses joueurs
+- [ ] Un Manager peut créer une convocation et sélectionner ses joueurs
 - [ ] Le bouton WhatsApp génère un message pré-rempli correct
 - [ ] Un User voit sa convocation avec le bon statut
 - [ ] Un joueur non convoqué ne voit pas la convocation
@@ -107,16 +106,16 @@ Sprint 7 → requiert Sprint 2 (events existent)
 > Objectif : suivi sportif opérationnel
 
 - [ ] Schema DB : presences, performances (stats jsonb)
-- [ ] Remplissage de la feuille de match (Manager Sportif)
-- [ ] Marquage des présences à l'entraînement (Manager Sportif)
+- [ ] Remplissage de la feuille de match (Manager)
+- [ ] Marquage des présences à l'entraînement (Manager)
 - [ ] Saisie des performances après match (buts, passes, note...)
 - [ ] Consultation de la feuille de match côté User
-- [ ] Publication de contenu par le Manager Sportif (PDF, lien, note)
+- [ ] Publication de contenu par le Manager (PDF, lien, note)
 - [ ] Consultation du contenu partagé côté User
 
 ### Definition of Done
-- [ ] Un Manager Sportif peut marquer les présences d'un entraînement
-- [ ] Un Manager Sportif peut remplir la feuille de match et saisir les stats
+- [ ] Un Manager peut marquer les présences d'un entraînement
+- [ ] Un Manager peut remplir la feuille de match et saisir les stats
 - [ ] Un User peut consulter la feuille de match après le match
 - [ ] Les stats sont stockées en jsonb et affichées correctement
 
@@ -127,7 +126,7 @@ Sprint 7 → requiert Sprint 2 (events existent)
 
 - [ ] Schema DB : posts, messages
 - [ ] Messagerie descendante Admin → tous les licenciés
-- [ ] Messagerie descendante Manager Sportif → son équipe uniquement
+- [ ] Messagerie descendante Manager → son équipe uniquement
 - [ ] Poster un résultat sur la page vitrine (Admin)
 - [ ] Corriger un résultat publié (Admin)
 - [ ] Page vitrine publique (résultats + actualités)
@@ -136,7 +135,7 @@ Sprint 7 → requiert Sprint 2 (events existent)
 
 ### Definition of Done
 - [ ] Un Admin peut envoyer un message à tous les licenciés du club
-- [ ] Un Manager Sportif peut envoyer un message à son équipe uniquement
+- [ ] Un Manager peut envoyer un message à son équipe uniquement
 - [ ] Un Admin peut poster et corriger un résultat sur la vitrine
 - [ ] Un User peut répondre à un sondage
 
@@ -150,34 +149,18 @@ Sprint 7 → requiert Sprint 2 (events existent)
 - [ ] Gestion des cotisations par licencié (ajout, statut payé/en attente/en retard)
 - [ ] Gestion des licences et inscriptions
 - [ ] Ajout / modification / suppression d'une dépense (Admin)
-- [ ] Ajout d'une dépense avec justificatif photo (Manager Associatif)
 - [ ] Catégorisation des dépenses
 - [ ] Ajout d'un sponsor avec informations de base
-- [ ] Historique des dépenses soumises (Manager Associatif)
 
 ### Definition of Done
 - [ ] Un Admin voit le tableau de bord financier consolidé (recettes, dépenses, solde)
 - [ ] Une cotisation est bien liée à un userId et visible dans le suivi Admin
-- [ ] Un Manager Associatif peut ajouter une dépense avec photo, pas plus
-- [ ] Un Manager Associatif n'a pas accès aux cotisations ni au tableau de bord
+- [ ] L'accès au module financier est strictement réservé à l'Admin
 
 ---
 
-## Sprint 7 — Événements associatifs
-> Objectif : Manager Associatif organise la vie du club
-
-- [ ] Schema DB : event_tasks, event_registrations
-- [ ] Création d'un événement avec todo list (Manager Associatif)
-- [ ] Assignation de tâches à des bénévoles
-- [ ] Suivi de l'avancement des tâches
-- [ ] Gestion de la liste des inscrits
-- [ ] Inscription en ligne à un événement (Users)
-
-### Definition of Done
-- [ ] Un Manager Associatif peut créer un événement et y ajouter des tâches
-- [ ] Un bénévole peut voir les tâches qui lui sont assignées
-- [ ] Un User peut s'inscrire à un événement
-- [ ] La liste des inscrits est visible par le Manager Associatif et l'Admin
+## Sprint 7 — _(supprimé)_
+> Anciens événements associatifs (todo lists / inscriptions) — feature retirée du MVP.
 
 ---
 

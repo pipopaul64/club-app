@@ -6,7 +6,6 @@
     "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
     "test": "vitest",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"

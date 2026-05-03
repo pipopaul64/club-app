@@ -5,15 +5,15 @@ import type { UserRole } from '@/db/schema'
 import { hasRole } from './roles'
 
 /**
- * Vérifie le rôle d'un utilisateur directement en base de données.
+ * Vérifie les rôles d'un utilisateur directement en base de données.
  * Source de vérité — à utiliser dans toutes les Server Actions.
  *
  * Conforme CLAUDE.md :
- *   const ok = await checkRole(session.user.id, ['admin', 'manager_sportif'])
+ *   const ok = await checkRole(session.user.id, ['admin', 'manager'])
  *   if (!ok) throw new Error('Forbidden')
  *
  * - Filtre les soft-deleted (deletedAt IS NULL)
- * - Admin cumule tous les droits (cf. DECISIONS.md)
+ * - Modèle additif (cf. DECISIONS.md) : aucune hiérarchie, intersection stricte
  * - Retourne false si l'utilisateur n'existe pas (pas de throw)
  */
 export async function checkRole(
@@ -22,10 +22,10 @@ export async function checkRole(
 ): Promise<boolean> {
   const user = await db.query.users.findFirst({
     where: and(eq(users.id, userId), isNull(users.deletedAt)),
-    columns: { role: true },
+    columns: { roles: true },
   })
 
   if (!user) return false
 
-  return hasRole(user.role as UserRole, requiredRoles)
+  return hasRole(user.roles as UserRole[], requiredRoles)
 }
