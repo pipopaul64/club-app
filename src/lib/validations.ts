@@ -95,3 +95,27 @@ export const createMessageSchema = z.object({
 })
 
 export type CreateMessageInput = z.infer<typeof createMessageSchema>
+
+// ---------------------------------------------------------------------------
+// Posts (vitrine)
+// ---------------------------------------------------------------------------
+export const postTypeSchema = z.enum(['result', 'news'])
+
+export const createPostSchema = z.object({
+  type:    postTypeSchema,
+  content: z.string().min(1, 'Le contenu ne peut pas être vide').max(5000, 'Contenu trop long (5000 caractères max)'),
+})
+
+export const updatePostSchema = createPostSchema
+
+export type CreatePostInput = z.infer<typeof createPostSchema>
+export type UpdatePostInput = z.infer<typeof updatePostSchema>
+
+// ---------------------------------------------------------------------------
+// Surveys
+// ---------------------------------------------------------------------------
+export const createSurveySchema = z.object({
+  title: z.string().min(2, 'La question doit faire au moins 2 caractères').max(500, 'Question trop longue'),
+})
+
+export type CreateSurveyInput = z.infer<typeof createSurveySchema>

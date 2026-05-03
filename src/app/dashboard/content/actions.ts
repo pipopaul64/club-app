@@ -164,6 +164,13 @@ export async function createMessage(
     content: parsed.data.content,
   })
 
+  // Notification email (fire-and-forget)
+  try {
+    await sendMessageNotification({ clubId, teamId: teamId ?? null, content: parsed.data.content, authorId: userId })
+  } catch {
+    // Échec silencieux
+  }
+
   revalidatePath('/dashboard/content')
   revalidatePath('/dashboard/manager/content')
   return { success: true, data: undefined }
@@ -191,4 +198,84 @@ export async function deleteMessage(messageId: string): Promise<ActionResult> {
   revalidatePath('/dashboard/content')
   revalidatePath('/dashboard/manager/content')
   return { success: true, data: undefined }
+}
+
+// ===========================================================================
+// NOTIFICATIONS
+// ===========================================================================
+
+async function sendMessageNotification(params: {
+  clubId: string
+  teamId: string | null
+  content: string
+  authorId: string
+}) {
+  if (!process.env.RESEND_API_KEY) return
+
+  const { clubId, teamId, content, authorId } = params
+
+  // Récupérer l'auteur
+  const author = await db.query.users.findFirst({
+    where: and(eq(users.id, authorId), isNull(users.deletedAt)),
+    columns: { name: true },
+  })
+
+  // Destinataires : membres de l'équipe ou tous les licenciés du club
+  let recipients: { email: string; name: string }[] = []
+
+  if (teamId) {
+    // Message d'équipe
+    const members = await db
+      .select({ email: users.email, name: users.name })
+      .from(teamMembers)
+      .innerJoin(users, eq(teamMembers.userId, users.id))
+      .where(
+        and(
+          eq(teamMembers.teamId, teamId),
+          eq(teamMembers.clubId, clubId),
+          isNull(users.deletedAt),
+        ),
+      )
+    recipients = members
+  } else {
+    // Message club-wide
+    const clubUsers = await db
+      .select({ email: users.email, name: users.name })
+      .from(users)
+      .where(and(eq(users.clubId, clubId), isNull(users.deletedAt)))
+    recipients = clubUsers
+  }
+
+  // Exclure l'auteur
+  recipients = recipients.filter((r) => r.email !== undefined)
+  if (recipients.length === 0) return
+
+  const { Resend } = await import('resend')
+  const resend = new Resend(process.env.RESEND_API_KEY)
+
+  const preview = content.length > 150 ? content.slice(0, 150) + '…' : content
+  const authorName = author?.name ?? 'Votre club'
+
+  await Promise.allSettled(
+    recipients.map(({ email, name }) =>
+      resend.emails.send({
+        from:    'ClubOS <onboarding@resend.dev>',
+        to:      email,
+        subject: `[ClubOS] Nouveau message de ${authorName}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px">
+            <h2 style="color:#353148;margin-bottom:4px">Nouveau message 💬</h2>
+            <p style="color:#353148">Bonjour ${name},</p>
+            <p style="color:#353148">${authorName} vous a envoyé un message :</p>
+            <div style="margin:16px 0;padding:16px;background:#f3f0ff;border-radius:8px;border-left:3px solid #8c60f3">
+              <p style="color:#353148;margin:0;white-space:pre-wrap">${preview}</p>
+            </div>
+            <p style="color:#8c60f3;font-size:14px">
+              Connectez-vous sur ClubOS pour lire le message complet.
+            </p>
+          </div>
+        `,
+      }),
+    ),
+  )
 }
