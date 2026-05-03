@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
+import Link from 'next/link'
 import type { SessionUser } from '@/types'
 
 export default async function DashboardPage() {
@@ -7,9 +8,81 @@ export default async function DashboardPage() {
   const user = session!.user as unknown as SessionUser
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-bold">Bienvenue, {user.name}</h1>
-      <p className="text-gray-600 mt-2">Rôle : {user.role}</p>
-    </main>
+    <div>
+      {/* Page header */}
+      <div
+        className="px-8 py-5"
+        style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e4e0ec' }}
+      >
+        <h1 className="text-xl font-bold" style={{ color: '#353148' }}>
+          Bonjour, {user.name} 👋
+        </h1>
+        <p className="text-sm mt-0.5" style={{ color: '#8e8a9c' }}>
+          Bienvenue sur votre tableau de bord ClubOS
+        </p>
+      </div>
+
+      {/* Body */}
+      <div className="p-8 max-w-2xl space-y-6">
+        <QuickLinks role={user.role} />
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Accès rapides contextuels
+// ---------------------------------------------------------------------------
+
+function QuickLinks({ role }: { role: string }) {
+  const links: { href: string; icon: string; title: string; desc: string }[] = [
+    { href: '/dashboard/calendar',    icon: '📅', title: 'Calendrier',   desc: 'Voir les événements du club' },
+    { href: '/dashboard/convocations', icon: '📨', title: 'Convocations', desc: 'Mes convocations et présences' },
+    { href: '/dashboard/content',     icon: '💬', title: 'Messages',     desc: 'Messages de mon équipe' },
+    { href: '/dashboard/surveys',     icon: '🗳️', title: 'Sondages',     desc: 'Répondre aux sondages en cours' },
+  ]
+
+  if (role === 'manager_sportif' || role === 'admin') {
+    links.push(
+      { href: '/dashboard/manager/convocations',       icon: '📣', title: 'Gérer convocations', desc: "Convoquer et composer l'équipe" },
+      { href: '/dashboard/manager/content',            icon: '📢', title: 'Envoyer un message', desc: 'Communiquer avec l\'équipe' },
+    )
+  }
+
+  if (role === 'manager_associatif' || role === 'admin') {
+    links.push(
+      { href: '/dashboard/manager-associatif/expenses', icon: '📤', title: 'Mes dépenses',      desc: 'Soumettre et suivre les dépenses' },
+    )
+  }
+
+  if (role === 'admin') {
+    links.push(
+      { href: '/dashboard/admin/users',   icon: '👥', title: 'Licenciés', desc: 'Gérer les membres du club' },
+      { href: '/dashboard/admin/finance', icon: '💰', title: 'Finances',  desc: 'Cotisations, dépenses, sponsors' },
+    )
+  }
+
+  return (
+    <div>
+      <h2 className="text-sm font-semibold mb-3" style={{ color: '#8e8a9c' }}>
+        Accès rapides
+      </h2>
+      <div className="grid grid-cols-2 gap-3">
+        {links.map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className="rounded-xl p-4 flex items-start gap-3 transition-shadow hover:shadow-sm"
+            style={{ backgroundColor: '#ffffff', border: '1px solid #e4e0ec' }}
+          >
+            <span className="text-xl flex-shrink-0">{l.icon}</span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium" style={{ color: '#353148' }}>{l.title}</p>
+              <p className="text-xs mt-0.5 leading-snug" style={{ color: '#8e8a9c' }}>{l.desc}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
   )
 }

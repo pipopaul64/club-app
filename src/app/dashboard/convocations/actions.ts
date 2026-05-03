@@ -179,6 +179,49 @@ export async function listMyConvocations() {
     .orderBy(asc(events.date))
 }
 
+// ---------------------------------------------------------------------------
+// listManagerEventsSummary — tous les événements des équipes du manager
+// (passés 60 j + à venir) avec le nombre de convocations par événement.
+// Utilisé par la page liste /dashboard/manager/convocations
+// ---------------------------------------------------------------------------
+export async function listManagerEventsSummary() {
+  const { userId, clubId, role } = await requireManagerAuth()
+
+  let teamIds: string[] = []
+
+  if (role === 'admin') {
+    const allTeams = await db.query.teams.findMany({
+      where: eq(teams.clubId, clubId),
+      columns: { id: true },
+    })
+    teamIds = allTeams.map((t) => t.id)
+  } else {
+    const managedTeams = await db.query.teams.findMany({
+      where: and(eq(teams.managerId, userId), eq(teams.clubId, clubId)),
+      columns: { id: true },
+    })
+    teamIds = managedTeams.map((t) => t.id)
+  }
+
+  if (teamIds.length === 0) return []
+
+  const since = new Date()
+  since.setDate(since.getDate() - 60)
+
+  return db.query.events.findMany({
+    where: and(
+      eq(events.clubId, clubId),
+      gte(events.date, since),
+      inArray(events.teamId, teamIds),
+    ),
+    with: {
+      team:         { columns: { id: true, name: true } },
+      convocations: { columns: { id: true } },
+    },
+    orderBy: (e, { desc }) => [desc(e.date)],
+  })
+}
+
 // ===========================================================================
 // MUTATIONS
 // ===========================================================================
