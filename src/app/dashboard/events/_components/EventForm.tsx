@@ -33,6 +33,7 @@ type EventFormProps = {
   defaultValues?: EventFormValues
   teams: Team[]
   requireTeam?: boolean   // Manager Sportif doit choisir une équipe
+  hideTeamField?: boolean // Évènement strictement club-wide (admin) — pas de teamId envoyé
   submitLabel: string
   cancelHref: string
   redirectTo?: string     // Où rediriger après succès (défaut: /dashboard/team/calendar)
@@ -45,6 +46,7 @@ export function EventForm({
   defaultValues,
   teams,
   requireTeam = false,
+  hideTeamField = false,
   submitLabel,
   cancelHref,
   redirectTo = '/dashboard/team/calendar',
@@ -193,41 +195,44 @@ export function EventForm({
         />
       </div>
 
-      {/* Équipe */}
-      <div>
-        <label htmlFor="teamId" className="block text-sm font-medium mb-1" style={labelStyle}>
-          Équipe{' '}
-          {!requireTeam && <span style={{ color: '#8e8a9c' }}>(optionnel — laisser vide pour tout le club)</span>}
-        </label>
-        {teams.length === 0 ? (
-          <p className="text-sm px-3 py-2 rounded-lg" style={{ color: '#8e8a9c', backgroundColor: '#f8f6fc' }}>
-            Aucune équipe disponible.
-          </p>
-        ) : (
-          <select
-            id="teamId"
-            name="teamId"
-            required={requireTeam}
-            defaultValue={defaultValues?.teamId ?? ''}
-            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
-            onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
-          >
-            {!requireTeam && <option value="">— Tout le club —</option>}
-            {requireTeam && (
-              <option value="" disabled>
-                Sélectionner une équipe…
-              </option>
-            )}
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+      {/* Équipe — masquée pour les évènements strictement club-wide (admin).
+          Sans champ teamId, formData.get('teamId') === null → null en DB. */}
+      {!hideTeamField && (
+        <div>
+          <label htmlFor="teamId" className="block text-sm font-medium mb-1" style={labelStyle}>
+            Équipe{' '}
+            {!requireTeam && <span style={{ color: '#8e8a9c' }}>(optionnel — laisser vide pour tout le club)</span>}
+          </label>
+          {teams.length === 0 ? (
+            <p className="text-sm px-3 py-2 rounded-lg" style={{ color: '#8e8a9c', backgroundColor: '#f8f6fc' }}>
+              Aucune équipe disponible.
+            </p>
+          ) : (
+            <select
+              id="teamId"
+              name="teamId"
+              required={requireTeam}
+              defaultValue={defaultValues?.teamId ?? ''}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+              style={inputStyle}
+              onFocus={(e) => (e.target.style.borderColor = '#8c60f3')}
+              onBlur={(e) => (e.target.style.borderColor = '#e4e0ec')}
+            >
+              {!requireTeam && <option value="">— Tout le club —</option>}
+              {requireTeam && (
+                <option value="" disabled>
+                  Sélectionner une équipe…
+                </option>
+              )}
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
 
       {/* Erreur */}
       {!state.success && state.error && (

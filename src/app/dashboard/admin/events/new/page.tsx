@@ -1,10 +1,8 @@
 import Link from 'next/link'
-import { createEvent, listEventFormTeams } from '@/app/dashboard/events/actions'
+import { createEvent } from '@/app/dashboard/events/actions'
 import { EventForm } from '@/app/dashboard/events/_components/EventForm'
 
-export default async function AdminNewEventPage() {
-  const teams = await listEventFormTeams()
-
+export default function AdminNewEventPage() {
   return (
     <div className="p-6 max-w-xl mx-auto">
       {/* Header */}
@@ -20,7 +18,8 @@ export default async function AdminNewEventPage() {
           Nouvel événement
         </h1>
         <p className="text-sm mt-1" style={{ color: '#8e8a9c' }}>
-          Laisser l&apos;équipe vide pour un événement ouvert à tout le club.
+          Cet événement sera ouvert à <strong>tout le club</strong>. Pour un
+          évènement réservé à une équipe, passez par <em>Mon équipe › Calendrier</em>.
         </p>
       </div>
 
@@ -30,8 +29,8 @@ export default async function AdminNewEventPage() {
       >
         <EventForm
           action={createEvent}
-          teams={teams}
-          requireTeam={false}
+          teams={[]}
+          hideTeamField
           submitLabel="Créer l'événement"
           cancelHref="/dashboard/admin/events"
           redirectTo="/dashboard/admin/events"
