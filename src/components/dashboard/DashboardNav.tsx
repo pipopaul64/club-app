@@ -74,7 +74,7 @@ const SECTIONS: NavSection[] = [
     items: [
       {
         href:  '/dashboard/admin/events',
-        icon:  '📅',
+        icon:  '🎪',
         label: 'Événements',
       },
       {
