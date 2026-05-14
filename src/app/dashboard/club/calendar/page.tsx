@@ -6,602 +6,161 @@ import { redirect } from 'next/navigation'
 import { listEvents, listAccessibleTeams } from '@/app/dashboard/events/actions'
 import { TeamFilter } from '@/app/dashboard/events/_components/TeamFilter'
 import { TypeFilter } from '@/app/dashboard/events/_components/TypeFilter'
-import type { EventType } from '@/db/schema'
 
-// ===========================================================================
-// CONSTANTES
-// ===========================================================================
-
-const MONTHS_FR = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-]
-const DAYS_SHORT_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-const DAYS_LONG_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
-
-type CalendarView = 'month' | 'week' | 'day'
-
-// ===========================================================================
-// UTILITAIRES DATE (timezone locale — cohérent avec les valeurs du formulaire)
-// ===========================================================================
-
-function localDateKey(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+const TYPE_LABELS: Record<string, string> = {
+  match:    'Match',
+  training: 'Entraînement',
+  other:    'Événement',
 }
-
-function currentMonthStr(): string {
-  const n = new Date()
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`
+const TYPE_COLORS: Record<string, { bg: string; color: string }> = {
+  match:    { bg: '#fef3c7', color: '#92400e' },
+  training: { bg: '#dbeafe', color: '#1e40af' },
+  other:    { bg: '#f3f0ff', color: '#6d28d9' },
 }
-
-function prevMonth(year: number, month: number): string {
-  return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`
-}
-function nextMonth(year: number, month: number): string {
-  return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`
-}
-
-function getMondayOfWeek(date: Date): Date {
-  const d = new Date(date)
-  const dow = d.getDay() // 0=Sun
-  d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow))
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d)
-  r.setDate(r.getDate() + n)
-  return r
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate()
-}
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDayLong(date: Date): string {
-  const idx = (date.getDay() + 6) % 7
-  return `${DAYS_LONG_FR[idx]} ${date.getDate()} ${MONTHS_FR[date.getMonth()]} ${date.getFullYear()}`
-}
-
-// ===========================================================================
-// BUILDER D'URL — préserve tous les filtres actifs
-// ===========================================================================
-
-function calUrl(params: {
-  view?: CalendarView
-  month?: string
-  date?: string
-  teamId?: string
-  type?: string
-}): string {
-  const p = new URLSearchParams()
-  if (params.view && params.view !== 'month') p.set('view', params.view)
-  if (params.month) p.set('month', params.month)
-  if (params.date) p.set('date', params.date)
-  if (params.teamId) p.set('teamId', params.teamId)
-  if (params.type) p.set('type', params.type)
-  const s = p.toString()
-  return s ? `/dashboard/club/calendar?${s}` : '/dashboard/club/calendar'
-}
-
-// ===========================================================================
-// COULEURS D'ÉVÉNEMENTS
-// ===========================================================================
-
-const EVENT_COLORS: Record<EventType, { color: string; bg: string; label: string }> = {
-  match:    { color: '#c0392b', bg: '#fdf0f0', label: 'Match' },
-  training: { color: '#2563eb', bg: '#eff6ff', label: 'Entraînement' },
-  other:    { color: '#8c60f3', bg: '#f3f0ff', label: 'Autre' },
-}
-
-// ===========================================================================
-// COMPOSANTS PARTAGÉS
-// ===========================================================================
-// Note : /dashboard/club/calendar est en lecture seule. Les boutons de
-// création (admin/manager) sont sur leurs sections dédiées
-// (/dashboard/admin/events/new, /dashboard/team/calendar/new).
-
-function ViewSwitcher({
-  view, month, date, teamId, type,
-}: {
-  view: CalendarView
-  month: string
-  date: string
-  teamId?: string
-  type?: string
-}) {
-  const views: { key: CalendarView; label: string }[] = [
-    { key: 'month', label: 'Mois' },
-    { key: 'week',  label: 'Semaine' },
-    { key: 'day',   label: 'Jour' },
-  ]
-  return (
-    <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid #e4e0ec' }}>
-      {views.map(({ key, label }) => (
-        <Link
-          key={key}
-          href={calUrl({ view: key, month, date, teamId, type })}
-          className="px-3 py-1.5 text-sm font-medium transition-colors"
-          style={
-            view === key
-              ? { backgroundColor: '#8c60f3', color: '#ffffff' }
-              : { backgroundColor: '#ffffff', color: '#353148' }
-          }
-        >
-          {label}
-        </Link>
-      ))}
-    </div>
-  )
-}
-
-type EventList = Awaited<ReturnType<typeof listEvents>>
-
-// Badge compact (vue mois/semaine)
-function EventBadge({ event }: { event: EventList[number] }) {
-  const cfg = EVENT_COLORS[event.type as EventType]
-  return (
-    <div
-      className="text-xs px-1.5 py-0.5 rounded truncate cursor-default"
-      style={{ color: cfg.color, backgroundColor: cfg.bg }}
-      title={`${formatTime(new Date(event.date))} — ${event.title}${event.team ? ` (${event.team.name})` : ''}`}
-    >
-      <span className="font-semibold">{formatTime(new Date(event.date))}</span>{' '}
-      {event.title}
-    </div>
-  )
-}
-
-// Carte détaillée (vue jour)
-function EventCard({ event }: { event: EventList[number] }) {
-  const cfg = EVENT_COLORS[event.type as EventType]
-  return (
-    <div
-      className="px-4 py-3 rounded-xl"
-      style={{ backgroundColor: cfg.bg, border: `1px solid ${cfg.color}22` }}
-    >
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-lg font-bold" style={{ color: '#353148' }}>
-          {formatTime(new Date(event.date))}
-        </span>
-        <span
-          className="text-xs font-medium px-2 py-0.5 rounded-full"
-          style={{ color: cfg.color, backgroundColor: cfg.color + '22' }}
-        >
-          {cfg.label}
-        </span>
-      </div>
-      <p className="font-semibold text-sm" style={{ color: '#353148' }}>{event.title}</p>
-      {event.team && (
-        <p className="text-xs mt-0.5" style={{ color: '#8e8a9c' }}>
-          {event.team.name}
-        </p>
-      )}
-      {event.location && (
-        <p className="text-xs mt-0.5" style={{ color: '#8e8a9c' }}>
-          📍 {event.location}
-        </p>
-      )}
-    </div>
-  )
-}
-
-// ===========================================================================
-// VUE MENSUELLE
-// ===========================================================================
-
-function MonthView({
-  year, month, events,
-}: {
-  year: number
-  month: number
-  events: EventList
-}) {
-  const today = new Date()
-  const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const firstDayOfWeek = (new Date(year, month - 1, 1).getDay() + 6) % 7
-
-  const byDay = new Map<number, EventList>()
-  for (const evt of events) {
-    const d = new Date(evt.date).getDate()
-    if (!byDay.has(d)) byDay.set(d, [])
-    byDay.get(d)!.push(evt)
-  }
-
-  const totalCells = firstDayOfWeek + daysInMonth
-  const trailingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7)
-
-  return (
-    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #e4e0ec' }}>
-      {/* En-têtes */}
-      <div className="grid grid-cols-7" style={{ backgroundColor: '#f8f6fc' }}>
-        {DAYS_SHORT_FR.map((d) => (
-          <div
-            key={d}
-            className="py-2 text-xs font-medium text-center"
-            style={{ color: '#8e8a9c', borderBottom: '1px solid #e4e0ec' }}
-          >
-            {d}
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-7">
-        {/* Cellules vides avant le 1er */}
-        {Array.from({ length: firstDayOfWeek }, (_, i) => (
-          <div key={`pre-${i}`} className="min-h-24 p-1"
-            style={{ backgroundColor: '#fafafa', borderRight: '1px solid #f0eef8', borderBottom: '1px solid #f0eef8' }}
-          />
-        ))}
-
-        {/* Jours */}
-        {Array.from({ length: daysInMonth }, (_, i) => {
-          const day = i + 1
-          const dayEvents = byDay.get(day) ?? []
-          const isToday = isCurrentMonth && today.getDate() === day
-          const cellIdx = firstDayOfWeek + i
-          const isLastRow = cellIdx >= (Math.ceil(totalCells / 7) - 1) * 7
-          const isLastCol = (cellIdx + 1) % 7 === 0
-
-          return (
-            <div
-              key={day}
-              className="min-h-24 p-1.5"
-              style={{
-                backgroundColor: isToday ? '#f3f0ff' : '#ffffff',
-                borderRight: isLastCol ? 'none' : '1px solid #f0eef8',
-                borderBottom: isLastRow ? 'none' : '1px solid #f0eef8',
-              }}
-            >
-              <div className="mb-1">
-                <span
-                  className="text-xs font-semibold w-6 h-6 inline-flex items-center justify-center rounded-full"
-                  style={isToday
-                    ? { backgroundColor: '#8c60f3', color: '#ffffff' }
-                    : { color: '#8e8a9c' }
-                  }
-                >
-                  {day}
-                </span>
-              </div>
-              <div className="space-y-0.5">
-                {dayEvents.map((evt) => <EventBadge key={evt.id} event={evt} />)}
-              </div>
-            </div>
-          )
-        })}
-
-        {/* Cellules vides après le dernier jour */}
-        {Array.from({ length: trailingCells }, (_, i) => (
-          <div key={`post-${i}`} className="min-h-24 p-1"
-            style={{ backgroundColor: '#fafafa' }}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ===========================================================================
-// VUE HEBDOMADAIRE
-// ===========================================================================
-
-function WeekView({ monday, events }: { monday: Date; events: EventList }) {
-  const today = new Date()
-
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = addDays(monday, i)
-    return { date: d, key: localDateKey(d) }
-  })
-
-  const byDay = new Map<string, EventList>()
-  for (const evt of events) {
-    const key = localDateKey(new Date(evt.date))
-    if (!byDay.has(key)) byDay.set(key, [])
-    byDay.get(key)!.push(evt)
-  }
-
-  return (
-    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #e4e0ec' }}>
-      <div className="grid grid-cols-7">
-        {days.map(({ date, key }, i) => {
-          const isToday = isSameDay(date, today)
-          const dayEvents = byDay.get(key) ?? []
-          const isLast = i === 6
-
-          return (
-            <div
-              key={key}
-              style={{ borderRight: isLast ? 'none' : '1px solid #e4e0ec' }}
-            >
-              {/* En-tête jour */}
-              <div
-                className="px-1 py-2 text-center"
-                style={{
-                  backgroundColor: isToday ? '#f3f0ff' : '#f8f6fc',
-                  borderBottom: '1px solid #e4e0ec',
-                }}
-              >
-                <div className="text-xs font-medium" style={{ color: '#8e8a9c' }}>
-                  {DAYS_SHORT_FR[i]}
-                </div>
-                <div
-                  className="text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full mx-auto mt-0.5"
-                  style={isToday
-                    ? { backgroundColor: '#8c60f3', color: '#ffffff' }
-                    : { color: '#353148' }
-                  }
-                >
-                  {date.getDate()}
-                </div>
-              </div>
-
-              {/* Événements */}
-              <div
-                className="min-h-36 p-1 space-y-0.5"
-                style={{ backgroundColor: isToday ? '#fdfcff' : '#ffffff' }}
-              >
-                {dayEvents.map((evt) => <EventBadge key={evt.id} event={evt} />)}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ===========================================================================
-// VUE JOURNALIÈRE
-// ===========================================================================
-
-function DayView({ events }: { events: EventList }) {
-  if (events.length === 0) {
-    return (
-      <div
-        className="rounded-xl p-10 text-center"
-        style={{ border: '1px solid #e4e0ec' }}
-      >
-        <p className="text-sm" style={{ color: '#8e8a9c' }}>
-          Aucun événement ce jour.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      {events.map((evt) => <EventCard key={evt.id} event={evt} />)}
-    </div>
-  )
-}
-
-// ===========================================================================
-// PAGE PRINCIPALE
-// ===========================================================================
 
 type Props = {
   searchParams: Promise<{
-    view?: string
-    month?: string
-    date?: string
     teamId?: string
-    type?: string
+    type?:   string
   }>
 }
 
-export default async function CalendarPage({ searchParams }: Props) {
-  const {
-    view: viewParam,
-    month: monthParam,
-    date: dateParam,
-    teamId,
-    type,
-  } = await searchParams
-
-  // Vue active (défaut : mois)
-  const view: CalendarView =
-    viewParam === 'week' ? 'week' : viewParam === 'day' ? 'day' : 'month'
-
-  // Date d'ancrage pour semaine/jour (locale, minuit)
-  const anchorDate = dateParam
-    ? new Date(dateParam + 'T00:00:00')
-    : new Date()
-  const anchorDateStr = localDateKey(anchorDate)
-
-  // Mois pour la vue mensuelle
-  const currentMonth = monthParam ?? currentMonthStr()
-  const [year, month] = currentMonth.split('-').map(Number)
-
-  // Lundi de la semaine courante
-  const monday = getMondayOfWeek(anchorDate)
-  const sunday = addDays(monday, 6)
+export default async function ClubCalendarPage({ searchParams }: Props) {
+  const { teamId, type } = await searchParams
 
   // Auth
-  let session = null
-  try {
-    session = await auth.api.getSession({ headers: await headers() })
-  } catch {
-    redirect('/login')
-  }
+  const session = await auth.api.getSession({ headers: await headers() })
   if (!session) redirect('/login')
 
-  // Plage de dates pour la requête
-  const dateRange =
-    view === 'week'
-      ? {
-          start: monday,
-          end: new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate(), 23, 59, 59),
-        }
-      : view === 'day'
-      ? {
-          start: new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate(), 0, 0, 0),
-          end:   new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate(), 23, 59, 59),
-        }
-      : undefined
+  // Plage : 60 j passés → +1 an
+  const since = new Date(); since.setDate(since.getDate() - 60)
+  const until = new Date(); until.setFullYear(until.getFullYear() + 1)
 
-  // Données en parallèle
-  const [eventList, teams] = await Promise.all([
-    listEvents({
-      month:     view === 'month' ? currentMonth : undefined,
-      dateRange: view !== 'month' ? dateRange    : undefined,
-      teamId,
-      type,
-    }),
+  // Données en parallèle. listEvents applique la visibilité par rôle :
+  //  - admin  → tous les événements du club
+  //  - manager → équipes gérées + événements club-wide
+  //  - user   → équipes où je joue + événements club-wide
+  const [allEvents, teams] = await Promise.all([
+    listEvents({ dateRange: { start: since, end: until }, teamId, type }),
     listAccessibleTeams(),
   ])
 
-  // Mois actif pour le switcher de vue (dérivé de la date d'ancrage)
-  const activeMonth =
-    view === 'month'
-      ? currentMonth
-      : `${anchorDate.getFullYear()}-${String(anchorDate.getMonth() + 1).padStart(2, '0')}`
-
-  // Titre de navigation + URLs prev/next
-  let navTitle = ''
-  let prevUrl = ''
-  let nextUrl = ''
-
-  if (view === 'month') {
-    navTitle = `${MONTHS_FR[month - 1]} ${year}`
-    prevUrl = calUrl({ view: 'month', month: prevMonth(year, month), teamId, type })
-    nextUrl = calUrl({ view: 'month', month: nextMonth(year, month), teamId, type })
-  } else if (view === 'week') {
-    const mM = monday.getMonth()
-    const sM = sunday.getMonth()
-    navTitle = mM === sM
-      ? `${monday.getDate()} – ${sunday.getDate()} ${MONTHS_FR[mM]} ${monday.getFullYear()}`
-      : `${monday.getDate()} ${MONTHS_FR[mM]} – ${sunday.getDate()} ${MONTHS_FR[sM]}`
-    prevUrl = calUrl({ view: 'week', date: localDateKey(addDays(monday, -7)), teamId, type })
-    nextUrl = calUrl({ view: 'week', date: localDateKey(addDays(monday,  7)), teamId, type })
-  } else {
-    navTitle = formatDayLong(anchorDate)
-    prevUrl = calUrl({ view: 'day', date: localDateKey(addDays(anchorDate, -1)), teamId, type })
-    nextUrl = calUrl({ view: 'day', date: localDateKey(addDays(anchorDate,  1)), teamId, type })
-  }
-
-  // Bouton "Aujourd'hui"
-  const showToday =
-    view === 'month'
-      ? currentMonth !== currentMonthStr()
-      : !isSameDay(anchorDate, new Date())
-
-  const todayUrl =
-    view === 'month'
-      ? calUrl({ teamId, type })
-      : calUrl({ view, date: localDateKey(new Date()), teamId, type })
+  const now      = new Date()
+  const upcoming = allEvents.filter((e) => new Date(e.date) >= now)
+  const past     = allEvents.filter((e) => new Date(e.date) <  now)
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 mb-4">
-        {/* Ligne 1 : navigation + titre + switcher de vue */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <Link
-              href={prevUrl}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-lg hover:opacity-70 transition-opacity"
-              style={{ border: '1px solid #e4e0ec', color: '#353148' }}
-            >
-              ‹
-            </Link>
-            <h1
-              className="text-lg font-bold text-center min-w-52"
-              style={{ color: '#353148' }}
-            >
-              {navTitle}
-            </h1>
-            <Link
-              href={nextUrl}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-lg hover:opacity-70 transition-opacity"
-              style={{ border: '1px solid #e4e0ec', color: '#353148' }}
-            >
-              ›
-            </Link>
-            {showToday && (
-              <Link
-                href={todayUrl}
-                className="text-xs px-2 py-1 rounded-md"
-                style={{ color: '#8c60f3', backgroundColor: '#8c60f318' }}
-              >
-                Aujourd&apos;hui
-              </Link>
-            )}
-          </div>
-
-          <ViewSwitcher
-            view={view}
-            month={activeMonth}
-            date={anchorDateStr}
-            teamId={teamId}
-            type={type}
-          />
-        </div>
-
-        {/* Ligne 2 : filtres + bouton ajout */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {teams.length > 0 && (
-            <Suspense>
-              <TeamFilter teams={teams} currentTeamId={teamId} />
-            </Suspense>
-          )}
-          <Suspense>
-            <TypeFilter currentType={type} />
-          </Suspense>
-        </div>
+    <div className="p-6 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold" style={{ color: '#353148' }}>Calendrier</h1>
+        <p className="text-sm mt-1" style={{ color: '#8e8a9c' }}>
+          Événements de votre club, toutes équipes confondues (60 jours passés + à venir)
+        </p>
       </div>
 
-      {/* ── Légende ────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        {Object.entries(EVENT_COLORS).map(([t, { color, bg, label }]) => (
-          <span
-            key={t}
-            className="text-xs font-medium px-2 py-0.5 rounded-full"
-            style={{ color, backgroundColor: bg }}
+      {/* Filtres */}
+      <div className="flex items-center gap-2 flex-wrap mb-6">
+        {teams.length > 1 && (
+          <Suspense>
+            <TeamFilter teams={teams} currentTeamId={teamId} />
+          </Suspense>
+        )}
+        <Suspense>
+          <TypeFilter currentType={type} />
+        </Suspense>
+      </div>
+
+      {/* Contenu */}
+      <div className="space-y-8">
+        {allEvents.length === 0 ? (
+          <div
+            className="rounded-xl p-10 text-center"
+            style={{ backgroundColor: '#ffffff', border: '1px solid #e4e0ec' }}
           >
-            {label}
-          </span>
+            <p className="text-2xl mb-2">📅</p>
+            <p className="text-sm font-medium" style={{ color: '#353148' }}>
+              Aucun événement
+            </p>
+            <p className="text-xs mt-1" style={{ color: '#8e8a9c' }}>
+              Les événements des 60 derniers jours et à venir apparaîtront ici.
+            </p>
+          </div>
+        ) : (
+          <>
+            {upcoming.length > 0 && (
+              <Section title={`À venir (${upcoming.length})`} events={upcoming} />
+            )}
+            {past.length > 0 && (
+              <Section title={`Passés — 60 derniers jours (${past.length})`} events={past} />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
+type Event = Awaited<ReturnType<typeof listEvents>>[number]
+
+function Section({ title, events }: { title: string; events: Event[] }) {
+  return (
+    <section>
+      <h2
+        className="text-xs font-semibold uppercase tracking-wide mb-3"
+        style={{ color: '#8e8a9c' }}
+      >
+        {title}
+      </h2>
+      <div className="space-y-2">
+        {events.map((event) => (
+          <EventRow key={event.id} event={event} />
         ))}
       </div>
+    </section>
+  )
+}
 
-      {/* ── Vues ───────────────────────────────────────────────────────── */}
-      {view === 'month' && (
-        <>
-          <MonthView year={year} month={month} events={eventList} />
-          {eventList.length === 0 && (
-            <p className="text-center text-sm mt-6" style={{ color: '#8e8a9c' }}>
-              Aucun événement ce mois-ci.
-            </p>
-          )}
-        </>
-      )}
+function EventRow({ event }: { event: Event }) {
+  const badge = TYPE_COLORS[event.type] ?? TYPE_COLORS.other
+  const label = TYPE_LABELS[event.type] ?? event.type
+  const isPast = new Date(event.date) < new Date()
 
-      {view === 'week' && (
-        <>
-          <WeekView monday={monday} events={eventList} />
-          {eventList.length === 0 && (
-            <p className="text-center text-sm mt-4" style={{ color: '#8e8a9c' }}>
-              Aucun événement cette semaine.
-            </p>
-          )}
-        </>
-      )}
+  const dateStr = new Date(event.date).toLocaleDateString('fr-FR', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  })
+  const timeStr = new Date(event.date).toLocaleTimeString('fr-FR', {
+    hour: '2-digit', minute: '2-digit',
+  })
 
-      {view === 'day' && (
-        <DayView events={eventList} />
-      )}
+  return (
+    <div
+      className="rounded-xl px-4 py-3 flex items-center gap-3"
+      style={{
+        backgroundColor: '#ffffff',
+        border: '1px solid #e4e0ec',
+        opacity: isPast ? 0.85 : 1,
+      }}
+    >
+      <span
+        className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+        style={{ backgroundColor: badge.bg, color: badge.color }}
+      >
+        {label}
+      </span>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold truncate" style={{ color: '#353148' }}>
+          {event.title}
+        </p>
+        <p className="text-xs mt-0.5" style={{ color: '#8e8a9c' }}>
+          {dateStr} · {timeStr}
+          {event.team && <span> · {event.team.name}</span>}
+          {event.location && <span> · 📍 {event.location}</span>}
+        </p>
+      </div>
     </div>
   )
 }
