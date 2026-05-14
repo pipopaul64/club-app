@@ -6,7 +6,7 @@ import { auth } from '@/lib/auth'
 import { checkRole } from '@/lib/check-role'
 import { isManagerOfTeam, listManagedTeamIds } from '@/lib/team-managers'
 import { createConvocationSchema } from '@/lib/validations'
-import { eq, and, inArray, isNull, gte, asc } from 'drizzle-orm'
+import { eq, and, inArray, isNull, gte } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import type { ActionResult } from '@/types'
@@ -148,33 +148,6 @@ export async function listAvailablePlayers(eventId: string) {
     )
 
   return members.filter((m) => !alreadyConvokedIds.has(m.id))
-}
-
-// ---------------------------------------------------------------------------
-// listMyConvocations — convocations de l'utilisateur connecté
-// ---------------------------------------------------------------------------
-export async function listMyConvocations() {
-  const { userId } = await getSessionContext()
-
-  return db
-    .select({
-      id: convocations.id,
-      status: convocations.status,
-      isStarter: convocations.isStarter,
-      event: {
-        id: events.id,
-        title: events.title,
-        type: events.type,
-        date: events.date,
-        location: events.location,
-      },
-      teamName: teams.name,
-    })
-    .from(convocations)
-    .innerJoin(events, eq(convocations.eventId, events.id))
-    .leftJoin(teams, eq(events.teamId, teams.id))
-    .where(eq(convocations.userId, userId))
-    .orderBy(asc(events.date))
 }
 
 // ---------------------------------------------------------------------------
@@ -349,7 +322,6 @@ export async function createConvocation(
     // Échec silencieux
   }
 
-  revalidatePath('/dashboard/club/convocations')
   revalidatePath('/dashboard/team/convocations')
   revalidatePath(`/dashboard/team/convocations/${parsed.data.eventId}`)
   return { success: true, data: { eventId: parsed.data.eventId } }
@@ -425,30 +397,11 @@ export async function removeFromConvocation(
 
   revalidatePath(`/dashboard/team/convocations/${conv.event.id}`)
   revalidatePath('/dashboard/team/convocations')
-  revalidatePath('/dashboard/club/convocations')
   return { success: true, data: undefined }
 }
 
-// ---------------------------------------------------------------------------
-// updateConvocationStatus — le joueur confirme ou décline
-// ---------------------------------------------------------------------------
-export async function updateConvocationStatus(
-  convocationId: string,
-  status: ConvocationStatus,
-): Promise<void> {
-  const { userId } = await getSessionContext()
-
-  // Un joueur ne peut modifier que sa propre convocation
-  await db
-    .update(convocations)
-    .set({ status })
-    .where(
-      and(eq(convocations.id, convocationId), eq(convocations.userId, userId)),
-    )
-
-  revalidatePath('/dashboard/club/convocations')
-  revalidatePath('/dashboard/team/convocations')
-}
+// Note : `updateConvocationStatus` (player accepts/declines) a été retirée
+// avec /dashboard/club/convocations. À ré-introduire si une UI joueur revient.
 
 // ===========================================================================
 // NOTIFICATIONS

@@ -59,11 +59,6 @@ const SECTIONS: NavSection[] = [
         href:  '/dashboard/club/calendar',
         icon:  '📅',
         label: 'Calendrier',
-      },
-      {
-        href:  '/dashboard/club/convocations',
-        icon:  '📨',
-        label: 'Convocations',
         also:  ['/dashboard/club/match-sheet'],
       },
       {
