@@ -36,7 +36,7 @@ export default async function DashboardPage() {
 
 function QuickLinks({ roles }: { roles: string[] }) {
   const links: { href: string; icon: string; title: string; desc: string }[] = [
-    { href: '/dashboard/club/calendar', icon: '📅', title: 'Calendrier', desc: 'Voir les événements du club' },
+    { href: '/dashboard/team/calendar', icon: '📅', title: 'Calendrier', desc: 'Calendrier de mon équipe' },
     { href: '/dashboard/club/content',  icon: '💬', title: 'Messages',   desc: 'Messages du club' },
     { href: '/dashboard/club/surveys',  icon: '🗳️', title: 'Sondages',   desc: 'Répondre aux sondages en cours' },
   ]

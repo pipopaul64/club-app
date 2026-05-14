@@ -56,15 +56,10 @@ const SECTIONS: NavSection[] = [
     title: 'Mon club',
     items: [
       {
-        href:  '/dashboard/club/calendar',
-        icon:  '📅',
-        label: 'Calendrier',
-        also:  ['/dashboard/club/match-sheet'],
-      },
-      {
         href:  '/dashboard/club/content',
         icon:  '💬',
         label: 'Messages',
+        also:  ['/dashboard/club/match-sheet'],
       },
       {
         href:  '/dashboard/club/surveys',

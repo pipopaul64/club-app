@@ -13,7 +13,7 @@ import type { ActionResult } from '@/types'
 import type { EventType, UserRole } from '@/db/schema'
 import type { SQL } from 'drizzle-orm'
 
-const REVALIDATE = '/dashboard/club/calendar'
+const REVALIDATE = '/dashboard/team/calendar'
 
 // ---------------------------------------------------------------------------
 // Helpers locaux — même pattern que admin/actions.ts (auth.api.getSession direct)
