@@ -46,10 +46,14 @@ async function requireEventAuth(allowedRoles: UserRole[]) {
 // ===========================================================================
 
 export type EventFilters = {
-  teamId?: string
-  type?: string
-  month?: string                        // 'YYYY-MM' — vue mensuelle
-  dateRange?: { start: Date; end: Date } // vues semaine / jour
+  teamId?:         string
+  /** Quand vrai en plus d'un teamId, inclut aussi les events club-wide (teamId IS NULL). */
+  includeClubWide?: boolean
+  /** Quand vrai (sans teamId), ne renvoie QUE les events club-wide (teamId IS NULL). */
+  clubWideOnly?:    boolean
+  type?:            string
+  month?:           string                          // 'YYYY-MM' — vue mensuelle
+  dateRange?:       { start: Date; end: Date }      // vues semaine / jour
 }
 
 // ---------------------------------------------------------------------------
@@ -97,11 +101,24 @@ export async function listEvents(filters?: EventFilters) {
         : isNull(events.teamId)
   }
 
+  // Filtre strict de scope (au-dessus de la visibilité) :
+  //  - clubWideOnly        → events sans équipe seulement
+  //  - teamId + includeClubWide → events de l'équipe X + events sans équipe
+  //  - teamId seul         → events de l'équipe X uniquement
+  let scopeCondition: SQL<unknown> | undefined
+  if (filters?.clubWideOnly) {
+    scopeCondition = isNull(events.teamId)
+  } else if (filters?.teamId) {
+    scopeCondition = filters.includeClubWide
+      ? or(eq(events.teamId, filters.teamId), isNull(events.teamId))
+      : eq(events.teamId, filters.teamId)
+  }
+
   return db.query.events.findMany({
     where: and(
       eq(events.clubId, clubId),
       visibilityCondition,
-      filters?.teamId ? eq(events.teamId, filters.teamId) : undefined,
+      scopeCondition,
       filters?.type ? eq(events.type, filters.type as EventType) : undefined,
       startDate ? gte(events.date, startDate) : undefined,
       endDate ? lte(events.date, endDate) : undefined,

@@ -395,31 +395,20 @@ export default async function TeamCalendarPage({ searchParams }: Props) {
   if (!clubId) redirect('/dashboard')
   const roles = ((session.user as { roles?: UserRole[] }).roles ?? ['user']) as UserRole[]
 
-  // Équipes
-  const myTeams    = await listMyTeams(userId, clubId, roles)
-  const activeTeam = pickActiveTeam(myTeams, requestedTeamId)
-  const isManager  = roles.includes('manager') || roles.includes('admin')
+  // Équipes + entrée synthétique « Tout le club » (events où teamId IS NULL)
+  const CLUB_WIDE_ID = '__club__'
+  const myTeams  = await listMyTeams(userId, clubId, roles)
+  const pickerTeams: { id: string; name: string; category: string; season: string }[] = [
+    ...myTeams,
+    { id: CLUB_WIDE_ID, name: '🌐 Tout le club', category: '', season: '' },
+  ]
+  const activeTeam   = pickActiveTeam(pickerTeams, requestedTeamId)
+  const isClubWide   = activeTeam?.id === CLUB_WIDE_ID
+  const isManager    = roles.includes('manager') || roles.includes('admin')
 
-  // Empty state si aucune équipe
-  if (!activeTeam) {
-    return (
-      <div className="p-6 max-w-6xl mx-auto">
-        <h1 className="text-xl font-bold mb-4" style={{ color: '#353148' }}>Calendrier</h1>
-        <div
-          className="rounded-xl p-10 text-center"
-          style={{ backgroundColor: '#ffffff', border: '1px solid #e4e0ec' }}
-        >
-          <p className="text-2xl mb-2">🏃</p>
-          <p className="text-sm font-medium" style={{ color: '#353148' }}>
-            Aucune équipe pour le moment
-          </p>
-          <p className="text-xs mt-1" style={{ color: '#8e8a9c' }}>
-            Vous n&apos;êtes membre ou manager d&apos;aucune équipe. Contactez un administrateur du club.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  // pickerTeams contient toujours au moins l'entrée club-wide → activeTeam
+  // ne peut pas être null. Garde-fou TS uniquement :
+  if (!activeTeam) redirect('/dashboard')
 
   // Vue active (défaut : mois)
   const view: CalendarView =
@@ -453,11 +442,15 @@ export default async function TeamCalendarPage({ searchParams }: Props) {
         }
       : undefined
 
-  // Filtré sur l'équipe active uniquement
+  // Filtrage selon l'équipe active :
+  //  - « Tout le club »  → uniquement les events sans équipe (teamId IS NULL)
+  //  - une équipe X     → events de l'équipe X + events club-wide
   const eventList = await listEvents({
     month:     view === 'month' ? currentMonth : undefined,
     dateRange: view !== 'month' ? dateRange    : undefined,
-    teamId:    activeTeam.id,
+    teamId:          isClubWide ? undefined : activeTeam.id,
+    clubWideOnly:    isClubWide || undefined,
+    includeClubWide: !isClubWide || undefined,
     type,
   })
 
@@ -550,11 +543,11 @@ export default async function TeamCalendarPage({ searchParams }: Props) {
 
         {/* Ligne 2 : picker équipe + filtre type + bouton ajout */}
         <div className="flex items-center gap-3 flex-wrap">
-          <TeamPicker teams={myTeams} activeId={activeTeam.id} />
+          <TeamPicker teams={pickerTeams} activeId={activeTeam.id} />
           <Suspense>
             <TypeFilter currentType={type} />
           </Suspense>
-          {isManager && (
+          {isManager && !isClubWide && (
             <Link
               href={`/dashboard/team/calendar/new?teamId=${activeTeam.id}`}
               className="ml-auto px-4 py-2 text-sm font-medium rounded-lg text-white whitespace-nowrap"
